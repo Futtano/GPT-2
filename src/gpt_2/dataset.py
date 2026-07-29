@@ -49,7 +49,6 @@ def download_pt_dataset(file_path='data/the-verdict.txt'):
     if Path(file_path).exists():
         return file_path
 
-    file_path = "the-verdict.txt"
     url = ("https://raw.githubusercontent.com/rasbt/"
         "LLMs-from-scratch/main/ch02/01_main-chapter-code/"
         "the-verdict.txt")
