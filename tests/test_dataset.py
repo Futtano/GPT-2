@@ -5,7 +5,8 @@ import tiktoken
 from gpt_2.dataset import (
     create_data_loader_v1,
     download_pt_dataset,
-    GPTDatasetV1
+    GPTDatasetV1,
+    get_root
 )
 
 TEXT_LENGTH = 20479

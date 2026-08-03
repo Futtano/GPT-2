@@ -7,8 +7,10 @@ requires-python = ">=3.13"
 dependencies = [
     "matplotlib>=3.11.1",
     "numpy>=2.4.4",
+    "tensorflow>=2.15.0",
     "tiktoken>=0.13.0",
     "torch>=2.13.0",
+    "tqdm>=4.66",
     "watermark>=2.6.0",
 ]
 

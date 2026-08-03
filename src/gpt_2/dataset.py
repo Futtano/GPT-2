@@ -1,3 +1,4 @@
+from pathlib import Path
 import torch
 from torch.utils.data import Dataset, DataLoader
 import tiktoken
@@ -43,9 +44,7 @@ def create_data_loader_v1(
     return dataloader
 
 def download_pt_dataset(file_path='data/the-verdict.txt'):
-    from pathlib import Path
     import urllib.request
-
     if Path(file_path).exists():
         return file_path
 
@@ -55,3 +54,6 @@ def download_pt_dataset(file_path='data/the-verdict.txt'):
     urllib.request.urlretrieve(url, file_path)
 
     return file_path
+
+def get_root():
+    return Path.cwd()
