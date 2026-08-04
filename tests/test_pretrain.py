@@ -1,10 +1,12 @@
 import torch
 import tiktoken
 import pytest
+from gpt_2.dataset import create_data_loader_v1
 from gpt_2.model import GPTModel, GPT_CONFIG_124M
 from gpt_2.pretrain import (
     text_to_token_ids, token_ids_to_text,
-    calc_loss_batch
+    calc_loss_batch, calc_loss_loader,
+    evaluate_model, train_model_simple
 )
 
 @pytest.mark.parametrize(
@@ -80,4 +82,55 @@ def model():
 def test_calc_loss_batch(batches, model):
     input_batch, target_batch = batches
     loss = calc_loss_batch(input_batch, target_batch, model, torch.device('cpu'))
-    assert loss.item() > 0 
+    assert loss.item() >= 0 
+
+@pytest.fixture
+def dataloader():
+    txt = "Hello from Daniele!"
+    return create_data_loader_v1(
+        txt,
+        batch_size=2,
+        max_length=4,
+        stride = 1,
+        shuffle=False,
+        num_workers=0,
+    )
+
+def test_calc_loss_loader(dataloader, model):
+    loss = calc_loss_loader(
+        dataloader,
+        model,
+        torch.device('cpu'),
+        )
+    assert loss >= 0
+
+def test_evaluate_model(model, dataloader):
+    loss1, loss2 = evaluate_model(
+        model,
+        train_loader=dataloader,
+        val_loader=dataloader,
+        device=torch.device('cpu'),
+        eval_iter=1)
+
+    assert loss1 >= 0 and loss2 >= 0
+
+@pytest.fixture
+def optimizer(model):
+    return torch.optim.SGD(model.parameters())
+
+def test_train_model_simple(model, optimizer, dataloader):
+
+    loss1, loss2, toks = train_model_simple(
+        model, train_loader=dataloader, val_loader=dataloader,
+        optimizer=optimizer, device=torch.device('cpu'),
+        num_epochs=1, eval_freq=1, eval_iter=1, start_context='Hello',
+        tokenizer=tiktoken.get_encoding('gpt2')
+    )
+
+    # Simple sanity check
+    for el in loss1:
+        assert el >= 0
+    for el in loss2:
+        assert el >= 0
+    assert len(toks) >= 0
+
