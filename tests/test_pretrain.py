@@ -6,7 +6,9 @@ from gpt_2.model import GPTModel, GPT_CONFIG_124M
 from gpt_2.pretrain import (
     text_to_token_ids, token_ids_to_text,
     calc_loss_batch, calc_loss_loader,
-    evaluate_model, train_model_simple
+    evaluate_model, train_model_simple,
+    softmax_with_temperature, generate,
+    assign
 )
 
 @pytest.mark.parametrize(
@@ -134,3 +136,41 @@ def test_train_model_simple(model, optimizer, dataloader):
         assert el >= 0
     assert len(toks) >= 0
 
+@pytest.mark.parametrize(
+    'logits',
+    [
+        torch.tensor([1., 2., 3., 4.]),
+        torch.tensor([5., 3., 0., 3.]),
+    ]
+)
+def test_softmax_with_temperature(logits):
+    temp = 1.
+    probs_unscaled = torch.softmax(logits, dim=0)
+    result = softmax_with_temperature(logits, temp)
+    assert torch.all(torch.eq(probs_unscaled, result))
+
+def test_generate(model):
+    idx = torch.tensor([[56, 75, 45, 66, 77, 34]])
+    result = generate(
+        model,
+        idx=idx,
+        max_new_tokens=20,
+        context_size=256,
+    )
+
+    result = result.flatten()
+    idx = idx.flatten()
+    assert len(result) > len(idx)
+    assert torch.all(torch.eq(result[:-20], idx))
+
+def test_assign():
+    with pytest.raises(ValueError):
+        assign(torch.zeros(1,2), torch.zeros(2, 2))
+
+    with pytest.raises(ValueError):
+        assign(torch.zeros(3,2), torch.ones(3, 3))
+
+    assert torch.all(torch.eq(
+        assign(torch.zeros(1, 5), torch.ones(1, 5)).data,
+        torch.ones(1, 5)
+    ))

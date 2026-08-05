@@ -5,10 +5,9 @@
 
 
 import os
-
-import requests
 import json
 import numpy as np
+import requests
 import tensorflow as tf
 from tqdm import tqdm
 
@@ -81,6 +80,7 @@ def download_file(url, destination, backup_url=None):
             except requests.exceptions.RequestException:
                 pass
 
+        # If we reach here, both attempts have failed
         error_message = (
             f"Failed to download from both primary URL ({url})"
             f"{' and backup URL (' + backup_url + ')' if backup_url else ''}."
