@@ -1,3 +1,4 @@
+import urllib.request
 from pathlib import Path
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -43,16 +44,16 @@ def create_data_loader_v1(
     )
     return dataloader
 
-def download_pt_dataset(file_path='data/the-verdict.txt'):
-    import urllib.request
+def download_pt_dataset(file_path="data/the-verdict.txt"):
     if Path(file_path).exists():
         return file_path
 
-    url = ("https://raw.githubusercontent.com/rasbt/"
+    url = (
+        "https://raw.githubusercontent.com/rasbt/"
         "LLMs-from-scratch/main/ch02/01_main-chapter-code/"
-        "the-verdict.txt")
+        "the-verdict.txt"
+    )
     urllib.request.urlretrieve(url, file_path)
-
     return file_path
 
 def get_root():
