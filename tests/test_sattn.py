@@ -131,17 +131,9 @@ def mhattn_args():
     'input, d_out',
     [
         (torch.ones((3, 4, 3)), 6),
-        pytest.param(
-            torch.ones((4, 6, 3)),
-            5,
-            marks=pytest.mark.xfail(
-                reason="d_out % num_heads != 0 should raise an assertion error"
-            )
-        ),
-
+        (torch.ones((8, 5, 3)), 18),
     ]
 )
-
 def test_mha(input, d_out, mhattn_args):
     mha = MultiHeadAttention(
         **mhattn_args, d_out=d_out
@@ -160,3 +152,15 @@ def test_mha(input, d_out, mhattn_args):
     # there are not NaN or torch.inf
     assert (~torch.isnan(context_vecs)).all()
     assert (~torch.isinf(context_vecs)).all()
+
+@pytest.mark.parametrize(
+    'd_out',
+    [
+        5, 7, 16,
+    ]
+)
+def test_mha_invalid_dout(d_out, mhattn_args):
+    with pytest.raises(ValueError, match="d_out must be divisible by num_heads"):
+        MultiHeadAttention(
+            **mhattn_args, d_out=d_out
+        )
