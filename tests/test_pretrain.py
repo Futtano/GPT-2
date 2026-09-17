@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import tiktoken
 import pytest
@@ -163,14 +164,34 @@ def test_generate(model):
     assert len(result) > len(idx)
     assert torch.all(torch.eq(result[:-20], idx))
 
-def test_assign():
+@pytest.mark.parametrize(
+    'left, right',
+    [
+        (torch.zeros(2, 6, dtype=torch.float64), np.ones((2, 6))),
+        (torch.zeros(3, 12, dtype=torch.float32), torch.ones(3, 12, dtype=torch.float64)),
+    ]
+)
+def test_assign(left, right):
+    expected = torch.as_tensor(
+        right,
+        dtype=left.dtype,
+        device=left.device,
+    ).clone()
+    result = assign(left, right)
+
+    if isinstance(right, np.ndarray):
+        right.fill(0)
+    else:
+        right.zero_()
+
+    assert torch.equal(result.detach(), expected)
+    assert result.requires_grad is True
+    assert result.dtype == left.dtype
+    assert result.device == left.device
+
+def test_assign_shape_mismatch():
     with pytest.raises(ValueError):
         assign(torch.zeros(1,2), torch.zeros(2, 2))
 
     with pytest.raises(ValueError):
         assign(torch.zeros(3,2), torch.ones(3, 3))
-
-    assert torch.all(torch.eq(
-        assign(torch.zeros(1, 5), torch.ones(1, 5)).data,
-        torch.ones(1, 5)
-    ))

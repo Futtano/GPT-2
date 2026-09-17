@@ -154,16 +154,27 @@ def generate(
   return idx
 
 def assign(left, right):
-  """
-  Check whether two tensors or arrays have the same shape and returns the
+  """Check whether two tensors or arrays have the same shape and returns the
   right tensor as a trainable parameter
+  Params:
+    left (torch.Tensor): destination tensor.
+    right (torch.Tensor | numpy.ndarray): source tensor
+
+  Returns:
+    torch.nn.Parameter
   """
   if left.shape != right.shape:
     raise ValueError(
         f"Shape mismatch. Left: {left.shape}, Right: {right.shape}"
     )
-  # Ensure the new tensor is on the correct device and has the correct dtype
-  return torch.nn.Parameter(torch.tensor(right, device=left.device, dtype=left.dtype))
+
+  right_tensor = torch.as_tensor(
+      right,
+      dtype=left.dtype,
+      device=left.device,
+  )
+  right_tensor = right_tensor.detach().clone()
+  return torch.nn.Parameter(right_tensor)
 
 def load_weights_into_gpt(gpt, params):
     gpt.pos_emb.weight = assign(gpt.pos_emb.weight, params['wpe'])
