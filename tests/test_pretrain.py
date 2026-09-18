@@ -3,7 +3,7 @@ import torch
 import tiktoken
 import pytest
 from gpt_2.dataset import create_data_loader_v1
-from gpt_2.model import GPTModel, GPT_CONFIG_124M
+from gpt_2.model import GPTModel
 from gpt_2.pretrain import (
     text_to_token_ids, token_ids_to_text,
     calc_loss_batch, calc_loss_loader,
@@ -12,11 +12,21 @@ from gpt_2.pretrain import (
     assign
 )
 
+TINY_GPT_CONFIG = {
+    "vocab_size": 50257,
+    "context_length": 32,
+    "emb_dim": 16,
+    "n_heads": 4,
+    "n_layers": 1,
+    "drop_rate": 0.0,
+    "qkv_bias": False,
+}
+
 @pytest.mark.parametrize(
         'input',
         [
             'My name is Daniele',
-            'Hello, foo!'
+            'Hello, foo!',
             '',
         ]
 )
@@ -32,7 +42,8 @@ def test_text_to_token_ids(input):
 
     # if empty string, an empty list must be returned
     if len(input) == 0:
-        assert len(token_ids) == 0
+        assert token_ids.numel() == 0
+        assert token_ids.shape == (1, 0)
     else: # each item must be an integer index
         for el in token_ids[0]:
             assert isinstance(el.item(), int)
@@ -80,7 +91,7 @@ def batches(text):
 
 @pytest.fixture
 def model():
-    return GPTModel(GPT_CONFIG_124M)
+    return GPTModel(TINY_GPT_CONFIG)
 
 def test_calc_loss_batch(batches, model):
     input_batch, target_batch = batches
