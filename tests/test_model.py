@@ -1,9 +1,19 @@
 import pytest
 import torch
 from gpt_2.model import (
-    GPT_CONFIG_124M, LayerNorm, GELU, FeedForward,
+    LayerNorm, GELU, FeedForward,
     TransformerBlock, GPTModel
 )
+
+TEST_GPT_CONFIG = {
+    "vocab_size": 128,
+    "context_length": 16,
+    "emb_dim": 16,
+    "n_heads": 4,
+    "n_layers": 1,
+    "drop_rate": 0.0,
+    "qkv_bias": False,
+}
 
 @pytest.mark.parametrize(
     'input',
@@ -65,9 +75,9 @@ def test_feed_forward(input, cfg):
 @pytest.mark.parametrize(
     'input, cfg',
     [
-        (torch.randn(2, 10, GPT_CONFIG_124M['emb_dim']), GPT_CONFIG_124M),
-        (torch.randn(3, 10, GPT_CONFIG_124M['emb_dim']), GPT_CONFIG_124M),
-        (torch.randn(1, 10, GPT_CONFIG_124M['emb_dim']), GPT_CONFIG_124M),
+        (torch.randn(2, 10, TEST_GPT_CONFIG['emb_dim']), TEST_GPT_CONFIG),
+        (torch.randn(3, 10, TEST_GPT_CONFIG['emb_dim']), TEST_GPT_CONFIG),
+        (torch.randn(1, 10, TEST_GPT_CONFIG['emb_dim']), TEST_GPT_CONFIG),
     ]
 )
 def test_transformer_block(input, cfg):
@@ -79,9 +89,9 @@ def test_transformer_block(input, cfg):
 @pytest.mark.parametrize(
     'input, cfg',
     [
-        (torch.randint(low=0, high=GPT_CONFIG_124M['vocab_size'], size=(2, 10)), GPT_CONFIG_124M),
-        (torch.randint(low=0, high=GPT_CONFIG_124M['vocab_size'], size=(3, 10)), GPT_CONFIG_124M),
-        (torch.randint(low=0, high=GPT_CONFIG_124M['vocab_size'], size=(1, 10)), GPT_CONFIG_124M),
+        (torch.randint(low=0, high=TEST_GPT_CONFIG['vocab_size'], size=(2, 10)), TEST_GPT_CONFIG),
+        (torch.randint(low=0, high=TEST_GPT_CONFIG['vocab_size'], size=(3, 10)), TEST_GPT_CONFIG),
+        (torch.randint(low=0, high=TEST_GPT_CONFIG['vocab_size'], size=(1, 10)), TEST_GPT_CONFIG),
     ]
 )
 def test_gpt_model(input, cfg):
