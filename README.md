@@ -13,6 +13,9 @@ This project currently contains a from-scratch GPT-2 implementation and the note
 
 It is a learning project for people who want to explore LLM training and fine-tuning without access to expensive GPU clusters or large datasets.
 
+The [engineering notes](docs/engineering-notes.md) collect the packaging,
+testing, and ML workflow lessons learned while developing the project.
+
 ## First supported workflow (TODO)
 
 Start a pre-training job through a CLI using a local text file and a configuration file. A small set of CLI options may override values such as the device and output directory.
