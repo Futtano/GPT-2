@@ -1,11 +1,15 @@
 import pytest
 import torch
+
+from dataclasses import asdict
+
+from gpt_2.config import ModelConfig
 from gpt_2.model import (
     LayerNorm, GELU, FeedForward,
     TransformerBlock, GPTModel
 )
 
-TEST_GPT_CONFIG = {
+TEST_GPT_CONFIG = ModelConfig(**{
     "vocab_size": 128,
     "context_length": 16,
     "emb_dim": 16,
@@ -13,7 +17,7 @@ TEST_GPT_CONFIG = {
     "n_layers": 1,
     "drop_rate": 0.0,
     "qkv_bias": False,
-}
+})
 
 @pytest.mark.parametrize(
     'input',
@@ -60,41 +64,46 @@ def test_gelu(input):
     assert torch.allclose(actual, expected, atol=1e-3)
 
 @pytest.mark.parametrize(
-    'input, cfg',
+    'input',
     [
-        (torch.randn(2, 10, 15), {'emb_dim': 15}),
-        (torch.randn(3, 10, 20), {'emb_dim': 20}),
-        (torch.randn(1, 10, 10), {'emb_dim': 10}),
+        (torch.randn(2, 10, 15)),
+        (torch.randn(3, 10, 20)),
+        (torch.randn(1, 10, 10)),
     ]
 )
-def test_feed_forward(input, cfg):
-    ff = FeedForward(cfg)
+def test_feed_forward(input):
+    ff = FeedForward(input.shape[-1])
     output = ff(input)
     assert output.shape == input.shape
 
 @pytest.mark.parametrize(
-    'input, cfg',
+    'input',
     [
-        (torch.randn(2, 10, TEST_GPT_CONFIG['emb_dim']), TEST_GPT_CONFIG),
-        (torch.randn(3, 10, TEST_GPT_CONFIG['emb_dim']), TEST_GPT_CONFIG),
-        (torch.randn(1, 10, TEST_GPT_CONFIG['emb_dim']), TEST_GPT_CONFIG),
+        (torch.randn(2, 10, TEST_GPT_CONFIG.emb_dim)),
+        (torch.randn(3, 10, TEST_GPT_CONFIG.emb_dim)),
+        (torch.randn(1, 10, TEST_GPT_CONFIG.emb_dim)),
     ]
 )
-def test_transformer_block(input, cfg):
-    tb = TransformerBlock(cfg)
+def test_transformer_block(input):
+    tb = TransformerBlock(TEST_GPT_CONFIG)
     output = tb(input)
     assert output.shape == input.shape
 
 
 @pytest.mark.parametrize(
-    'input, cfg',
+    'input',
     [
-        (torch.randint(low=0, high=TEST_GPT_CONFIG['vocab_size'], size=(2, 10)), TEST_GPT_CONFIG),
-        (torch.randint(low=0, high=TEST_GPT_CONFIG['vocab_size'], size=(3, 10)), TEST_GPT_CONFIG),
-        (torch.randint(low=0, high=TEST_GPT_CONFIG['vocab_size'], size=(1, 10)), TEST_GPT_CONFIG),
+        (torch.randint(low=0, high=TEST_GPT_CONFIG.vocab_size, size=(2, 10))),
+        (torch.randint(low=0, high=TEST_GPT_CONFIG.vocab_size, size=(3, 10))),
+        (torch.randint(low=0, high=TEST_GPT_CONFIG.vocab_size, size=(1, 10))),
     ]
 )
-def test_gpt_model(input, cfg):
-    gpt = GPTModel(cfg)
+def test_gpt_model(input):
+    gpt = GPTModel(TEST_GPT_CONFIG)
     output = gpt(input)
-    assert output.shape == (input.shape[0], input.shape[1], cfg['vocab_size'])
+    assert output.shape == (input.shape[0], input.shape[1], TEST_GPT_CONFIG.vocab_size)
+
+def test_gpt_model_accepts_mapping():
+    model = GPTModel(asdict(TEST_GPT_CONFIG))
+
+    assert model.config == TEST_GPT_CONFIG

@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import tiktoken
 import pytest
+
+from gpt_2.config import ModelConfig
 from gpt_2.dataset import create_data_loader_v1
 from gpt_2.model import GPTModel
 from gpt_2.pretrain import (
@@ -12,7 +14,7 @@ from gpt_2.pretrain import (
     assign
 )
 
-TINY_GPT_CONFIG = {
+TINY_GPT_CONFIG = ModelConfig(**{
     "vocab_size": 50257,
     "context_length": 32,
     "emb_dim": 16,
@@ -20,7 +22,7 @@ TINY_GPT_CONFIG = {
     "n_layers": 1,
     "drop_rate": 0.0,
     "qkv_bias": False,
-}
+})
 
 @pytest.mark.parametrize(
         'input',
@@ -84,7 +86,7 @@ def batches(text):
         input_batch.append(torch.tensor(token_ids[i : i + context_length]))
         target_batch.append(torch.tensor(token_ids[i+1 : i + context_length + 1]))
 
-    input_batch = torch.stack(input_batch, dim=0)    
+    input_batch = torch.stack(input_batch, dim=0)
     target_batch = torch.stack(target_batch, dim=0)
 
     return input_batch, target_batch
@@ -96,7 +98,7 @@ def model():
 def test_calc_loss_batch(batches, model):
     input_batch, target_batch = batches
     loss = calc_loss_batch(input_batch, target_batch, model, torch.device('cpu'))
-    assert loss.item() >= 0 
+    assert loss.item() >= 0
 
 @pytest.fixture
 def dataloader():

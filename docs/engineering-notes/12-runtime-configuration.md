@@ -52,10 +52,49 @@ validation for later fields. Include boundaries and cross-field cases
 explicitly. Use `dataclasses.asdict` for resolved configuration serialization
 and test the resulting field mapping.
 
+## Normalize mappings at the boundary
+
+Notebooks and configuration-file parsers naturally produce dictionaries,
+while model internals benefit from typed attribute access. Support both by
+normalizing once at the public boundary:
+
+```python
+def ensure_model_config(
+    config: ModelConfig | Mapping[str, Any],
+) -> ModelConfig:
+    if isinstance(config, ModelConfig):
+        return config
+
+    return ModelConfig(**config)
+```
+
+Constructors can accept the compatibility union, convert immediately, and use
+only typed attributes afterward:
+
+```python
+class GPTModel(nn.Module):
+    def __init__(self, config: ModelConfig | Mapping[str, Any]):
+        super().__init__()
+        self.config = ensure_model_config(config)
+        self.tok_emb = nn.Embedding(
+            self.config.vocab_size,
+            self.config.emb_dim,
+        )
+```
+
+This keeps dictionary-based notebooks working while ensuring all model
+construction passes through runtime validation. Tests should primarily pass
+`ModelConfig` instances and retain one explicit mapping-compatibility test.
+
+Give lower-level components only the settings they need. `FeedForward`, for
+example, needs `emb_dim`, not the complete model configuration. Narrow inputs
+reduce coupling and make components easier to test.
+
 ## Further reading
 
 - [Python documentation: `dataclasses`](https://docs.python.org/3/library/dataclasses.html)
 - [Python documentation: `numbers`](https://docs.python.org/3/library/numbers.html)
 - [Python documentation: `math.isfinite`](https://docs.python.org/3/library/math.html#math.isfinite)
+- [Python documentation: `collections.abc.Mapping`](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping)
 
 [Back to the engineering-notes index](../engineering-notes.md)

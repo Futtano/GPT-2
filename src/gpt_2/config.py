@@ -1,5 +1,7 @@
 import math
 from numbers import Real
+from typing import Any
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 @dataclass(frozen=True)
@@ -46,3 +48,9 @@ class ModelConfig:
         # emb_dim must be divisible by n_heads
         if self.emb_dim % self.n_heads != 0:
             raise ValueError(f"{self.emb_dim=} must be divisible by {self.n_heads=}.")
+
+def ensure_model_config(config: ModelConfig | Mapping[str, Any]) -> ModelConfig:
+    if isinstance(config, ModelConfig):
+        return config
+
+    return ModelConfig(**config)

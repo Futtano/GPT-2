@@ -16,12 +16,13 @@ finished.
 - Removed the tensor-copy warning and tested storage ownership.
 - Replaced full GPT-2 models in unit tests with small configurations.
 - Added a frozen, runtime-validated `ModelConfig`.
+- Wired typed configuration through model internals while preserving dictionary
+  compatibility at public constructors.
 - Organized unit tests to mirror the `gpt_2` package.
-- Reached 104 passing tests with warnings treated as errors.
+- Reached 108 passing tests with warnings treated as errors.
 
 ## Still planned
 
-- Wire `ModelConfig` into model construction.
 - Add typed training and data configuration.
 - Load configuration from a user-supplied file.
 - Split data before constructing overlapping token windows.

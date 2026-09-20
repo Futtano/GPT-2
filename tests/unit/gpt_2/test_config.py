@@ -1,6 +1,6 @@
 import pytest
 from dataclasses import FrozenInstanceError, asdict
-from gpt_2.config import ModelConfig
+from gpt_2.config import ModelConfig, ensure_model_config
 
 VALID_CONFIG = {
     "vocab_size": 128,
@@ -107,3 +107,18 @@ def test_to_dict(config):
         vocab_size=100, context_length=100, emb_dim=120,
         n_heads=12, n_layers=20, drop_rate=0.5, qkv_bias=True
     )
+
+def test_ensure_model_config_returns_existing_instance(config):
+    assert ensure_model_config(config) is config
+
+
+def test_ensure_model_config_converts_mapping():
+    result = ensure_model_config(VALID_CONFIG)
+
+    assert result == ModelConfig(**VALID_CONFIG)
+
+def test_ensure_model_config_validates_mapping():
+    values = VALID_CONFIG | {"emb_dim": 18}
+
+    with pytest.raises(ValueError, match="divisible"):
+        ensure_model_config(values)
