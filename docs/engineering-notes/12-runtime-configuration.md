@@ -90,11 +90,74 @@ Give lower-level components only the settings they need. `FeedForward`, for
 example, needs `emb_dim`, not the complete model configuration. Narrow inputs
 reduce coupling and make components easier to test.
 
+## Separate model and training configuration
+
+Model architecture and training procedure change for different reasons, so
+they belong in separate dataclasses. `ModelConfig` describes the network that
+must be reconstructed when a checkpoint is loaded. `TrainingConfig` describes
+how that network is optimized and evaluated:
+
+```python
+DeviceName = Literal["auto", "cpu", "cuda", "mps"]
+
+@dataclass(frozen=True)
+class TrainingConfig:
+    batch_size: int
+    learning_rate: float
+    num_epochs: int
+    eval_every_steps: int
+    eval_batches: int
+    checkpoint_every_steps: int
+    seed: int
+    device: DeviceName
+```
+
+Names should include their unit when a bare word would be ambiguous.
+`eval_every_steps` makes it clear that the frequency counts optimizer steps,
+not batches, epochs, examples, or tokens.
+
+Use small validation functions for rules shared by multiple dataclasses. This
+keeps each `__post_init__` readable and gives common concepts one consistent
+meaning:
+
+- counts such as batch size and epoch count are positive integers;
+- seeds are non-negative integers, so seed zero remains valid;
+- learning rates are finite real numbers strictly greater than zero;
+- Booleans are rejected where integers are expected.
+
+When validating an abstract `numbers.Real`, convert it to a concrete `float`
+after the runtime type check. This gives static analyzers a concrete type for
+comparisons. Catch `OverflowError` so a value too large to represent still
+produces the validator's documented `ValueError`.
+
+## Static constraints still need runtime checks
+
+`Literal` tells a static type checker which strings are permitted, but Python
+does not enforce it while constructing a dataclass. Keep a runtime collection
+for validation:
+
+```python
+DeviceName = Literal["auto", "cpu", "cuda", "mps"]
+ALLOWED_DEVICES = ("auto", "cpu", "cuda", "mps")
+
+if self.device not in ALLOWED_DEVICES:
+    raise ValueError(...)
+```
+
+The alias and tuple serve different consumers: `DeviceName` supports editors
+and static analysis, while `ALLOWED_DEVICES` supports runtime validation.
+
+Keep the configured device as a serializable string. Resolve `"auto"` to a
+concrete `torch.device` at the execution boundary, where hardware availability
+can be inspected. This keeps configuration independent of PyTorch runtime
+state and easy to serialize with `dataclasses.asdict`.
+
 ## Further reading
 
 - [Python documentation: `dataclasses`](https://docs.python.org/3/library/dataclasses.html)
 - [Python documentation: `numbers`](https://docs.python.org/3/library/numbers.html)
 - [Python documentation: `math.isfinite`](https://docs.python.org/3/library/math.html#math.isfinite)
 - [Python documentation: `collections.abc.Mapping`](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping)
+- [Python typing specification: literal types](https://typing.python.org/en/latest/spec/literal.html)
 
 [Back to the engineering-notes index](../engineering-notes.md)
