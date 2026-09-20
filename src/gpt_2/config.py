@@ -108,6 +108,38 @@ class TrainingConfig:
         if self.device not in ALLOWED_DEVICES:
             raise ValueError(f"device must be one of {ALLOWED_DEVICES}; got {self.device!r}.")
 
+@dataclass(frozen=True)
+class DataConfig:
+    train_fraction: float
+    validation_fraction: float
+    stride: int
+    num_workers: int
+
+    @property
+    def test_fraction(self) -> float:
+        return 1.0 - self.train_fraction - self.validation_fraction
+
+    def __post_init__(self) -> None:
+        _validate_finite_bounded_float(
+            "train_fraction", self.train_fraction,
+            lower=0.0, upper=1.0,
+            inclusive_lower=False, inclusive_upper=False,
+        )
+        _validate_finite_bounded_float(
+            "validation_fraction", self.validation_fraction,
+            lower=0.0, upper=1.0,
+            inclusive_lower=False, inclusive_upper=False,
+        )
+
+        if self.train_fraction + self.validation_fraction >= 1.0:
+            raise ValueError(
+                "train_fraction + validation_fraction must be less than 1 "
+                "so test_fraction is positive."
+            )
+
+        _validate_positive_int('stride', self.stride)
+        _validate_nonnegative_int('num_workers', self.num_workers)
+
 def ensure_model_config(config: ModelConfig | Mapping[str, Any]) -> ModelConfig:
     if isinstance(config, ModelConfig):
         return config

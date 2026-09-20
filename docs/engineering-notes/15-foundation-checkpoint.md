@@ -21,14 +21,15 @@ finished.
 - Added a frozen, runtime-validated `TrainingConfig` with explicit step-based
   frequencies, finite learning-rate checks, seed validation, and constrained
   device names.
+- Added a frozen, runtime-validated `DataConfig` with explicit split fractions,
+  a derived test fraction, stride, and worker count.
 - Extracted reusable validators for positive integers, non-negative integers,
   bounded finite real numbers, and Booleans.
 - Organized unit tests to mirror the `gpt_2` package.
-- Reached 169 passing tests with warnings treated as errors.
+- Reached 213 passing tests with warnings treated as errors.
 
 ## Still planned
 
-- Add typed data configuration.
 - Load configuration from a user-supplied file.
 - Split data before constructing overlapping token windows.
 - Expose the pre-training workflow through an installed CLI.

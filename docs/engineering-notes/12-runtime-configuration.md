@@ -152,6 +152,47 @@ concrete `torch.device` at the execution boundary, where hardware availability
 can be inspected. This keeps configuration independent of PyTorch runtime
 state and easy to serialize with `dataclasses.asdict`.
 
+## Represent the data policy separately
+
+`DataConfig` describes how one token sequence will be divided and windowed:
+
+```python
+@dataclass(frozen=True)
+class DataConfig:
+    train_fraction: float
+    validation_fraction: float
+    stride: int
+    num_workers: int
+
+    @property
+    def test_fraction(self) -> float:
+        return 1.0 - self.train_fraction - self.validation_fraction
+```
+
+Training and validation fractions must each be finite and strictly between
+zero and one. Their sum must be less than one so the derived test fraction is
+positive. Keeping the test fraction derived avoids three independently
+configured values that could disagree or fail to sum to one.
+
+The configuration validates proportions, but it cannot guarantee usable
+splits without knowing the dataset length. A positive validation fraction may
+still produce zero validation tokens in a very short dataset. Later pipeline
+validation must check the computed token counts and, before constructing model
+samples, ensure every split is long enough to contain at least one complete
+input-target window.
+
+Keep ownership clear across configuration classes:
+
+- `ModelConfig.context_length` defines the model's architectural limit.
+- `TrainingConfig.batch_size` controls optimization batching.
+- `DataConfig.stride` and split fractions control dataset construction.
+- Input and output paths are operational arguments supplied at the workflow
+  boundary.
+
+Derived properties are not dataclass fields and therefore do not appear in
+`dataclasses.asdict`. Add derived values explicitly later if the resolved run
+artifact should record them.
+
 ## Further reading
 
 - [Python documentation: `dataclasses`](https://docs.python.org/3/library/dataclasses.html)

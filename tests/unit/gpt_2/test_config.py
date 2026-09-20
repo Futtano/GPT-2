@@ -1,6 +1,9 @@
 import pytest
 from dataclasses import FrozenInstanceError, asdict
-from gpt_2.config import ModelConfig, TrainingConfig, ensure_model_config
+from gpt_2.config import (
+    ModelConfig, TrainingConfig, DataConfig,
+    ensure_model_config,
+)
 
 VALID_CONFIG = {
     "vocab_size": 128,
@@ -21,6 +24,13 @@ VALID_TRAINING_CONFIG = {
     "checkpoint_every_steps": 100,
     "seed": 0,
     "device": "auto",
+}
+
+VALID_DATA_CONFIG = {
+    "train_fraction": 0.7,
+    "validation_fraction": 0.15,
+    "stride": 100,
+    "num_workers": 2,
 }
 
 @pytest.mark.parametrize(
@@ -233,13 +243,128 @@ def training_config():
     return TrainingConfig(
         **VALID_TRAINING_CONFIG
     )
-def test_immutability(training_config):
+def test_training_config_immutability(training_config):
     with pytest.raises(FrozenInstanceError):
         training_config.num_epochs = 'foo'
 
-def test_to_dict(training_config):
+def test_training_config_to_dict(training_config):
     config_dict = asdict(training_config)
     assert isinstance(config_dict, dict)
     assert config_dict == dict(
         **VALID_TRAINING_CONFIG
+    )
+
+
+#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
+# DATA CONFIG TESTS
+#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
+
+@pytest.mark.parametrize(
+    'train_fraction, validation_fraction, ' \
+    'stride, num_workers',
+    [
+        (0.7, 0.1, 100, 0),
+        (0.6, 0.2, 200, 1),
+        (0.5, 0.4, 300, 2),
+        (0.65, 0.3, 400, 3),
+        (0.75, 0.2, 500, 4),
+        (0.8, 0.1, 600, 3),
+        (0.9, 0.05, 700, 2),
+        (0.55, 0.4, 800, 1),
+        (0.6, 0.3, 900, 0),
+        (0.7, 0.2, 100, 1),
+    ]
+)
+def test_accepts_valid_data_config(
+    train_fraction, validation_fraction,
+    stride, num_workers):
+    DataConfig(
+        train_fraction, validation_fraction,
+        stride, num_workers
+    )
+
+@pytest.mark.parametrize(
+    "field,value,message",
+    [
+        ("stride", 0, "stride"),
+        ("stride", -1, "stride"),
+        ("stride", float('inf'), "stride"),
+        ("stride", float('-inf'), "stride"),
+        ("stride", 2.0, "stride"),
+        ("stride", True, "stride"),
+        ("num_workers", -1, "num_workers"),
+        ("num_workers", float('inf'), "num_workers"),
+        ("num_workers", float('-inf'), "num_workers"),
+        ("num_workers", 2.0, "num_workers"),
+        ("num_workers", True, "num_workers"),
+        ("train_fraction", -3, "train_fraction"),
+        ("train_fraction", float('inf'), "train_fraction"),
+        ("train_fraction", float('-inf'), "train_fraction"),
+        ("train_fraction", float("nan"), "train_fraction"),
+        ("train_fraction", -3.0, "train_fraction"),
+        ("train_fraction", False, "train_fraction"),
+        ("train_fraction", 0.0, "train_fraction"),
+        ("train_fraction", 1.0, "train_fraction"),
+        ("train_fraction", 1.1, "train_fraction"),
+        ("validation_fraction", 1.0, "validation_fraction"),
+        ("validation_fraction", 1.1, "validation_fraction"),
+        ("validation_fraction", -3, "validation_fraction"),
+        ("validation_fraction", float('inf'), "validation_fraction"),
+        ("validation_fraction", float('-inf'), "validation_fraction"),
+        ("validation_fraction", float("nan"), "validation_fraction"),
+        ("validation_fraction", -3.0, "validation_fraction"),
+        ("validation_fraction", False, "validation_fraction"),
+        ("validation_fraction", 0.0, "validation_fraction"),
+    ],
+)
+def test_rejects_invalid_data_config_field(field, value, message):
+    # Dictionary union creates a new dictionary, leaving the original unchanged.
+    values = VALID_DATA_CONFIG | {field: value}
+
+    with pytest.raises(ValueError, match=message):
+        DataConfig(**values)
+
+def test_calculates_test_fraction():
+    config = DataConfig(
+        train_fraction=0.7,
+        validation_fraction=0.15,
+        stride=128,
+        num_workers=0,
+    )
+
+    assert config.test_fraction == pytest.approx(0.15)
+
+@pytest.mark.parametrize(
+    "train_fraction,validation_fraction",
+    [
+        (0.75, 0.25),  # test fraction is zero
+        (0.75, 0.50),  # test fraction is negative
+    ],
+)
+def test_rejects_nonpositive_test_fraction(
+    train_fraction,
+    validation_fraction,
+):
+    with pytest.raises(ValueError, match="test_fraction"):
+        DataConfig(
+            train_fraction=train_fraction,
+            validation_fraction=validation_fraction,
+            stride=128,
+            num_workers=0,
+        )
+
+@pytest.fixture
+def data_config():
+    return DataConfig(
+        **VALID_DATA_CONFIG
+    )
+def test_data_config_immutability(data_config):
+    with pytest.raises(FrozenInstanceError):
+        data_config.stride = 'foo'
+
+def test_data_config_to_dict(data_config):
+    config_dict = asdict(data_config)
+    assert isinstance(config_dict, dict)
+    assert config_dict == dict(
+        **VALID_DATA_CONFIG
     )
