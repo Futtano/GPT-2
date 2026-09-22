@@ -8,23 +8,61 @@ import tiktoken
 
 from gpt_2.config import DataConfig
 
-class GPTDatasetV1(Dataset):
+class GPTTokenDataset(Dataset):
+    def __init__(
+            self, token_ids: Sequence[int], context_length: int,
+            stride: int
+    ) -> None:
+        super().__init__()
+
+        if not isinstance(context_length, int) or isinstance(context_length, bool):
+            raise ValueError(f"context length must be an integer quantity")
+        if context_length <= 0:
+            raise ValueError("context length must be strictly bigger than zero.")
+        if context_length > len(token_ids) - 1:
+            raise ValueError(
+                f"number of dataset tokens ({len(token_ids)})\n" \
+                f"is not sufficient for a context length of size {context_length}."
+            )
+        if not isinstance(stride, int) or isinstance(stride, bool):
+            raise ValueError(f"stride must be an integer quantity")
+        if stride <= 0:
+            raise ValueError("stride must be strictly bigger than zero.")
+        # if stride > self.context_length:
+        #     raise ValueError(
+        #         f"stride must be smaller or equal than context length"
+        #     )
+
+        # len(token_ids) - context_length - 1 is the last window's start index
+        # divide by stride and add 1 (count the window starting at zero) to
+        # obtain the total number of windows
+        self.token_ids = torch.tensor(token_ids, dtype=torch.long)
+        self.context_length = context_length
+        self.stride = stride
+        self.n_windows = (
+            (len(token_ids) - context_length - 1) // stride
+        ) + 1
+
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+        start = index * self.stride
+        stop = start + self.context_length
+
+        inputs = self.token_ids[start:stop]
+        targets = self.token_ids[start + 1:stop + 1]
+
+        return inputs, targets
+
+    def __len__(self) -> int:
+        return self.n_windows
+
+class GPTDatasetV1(GPTTokenDataset):
     def __init__(self, txt, tokenizer, max_length, stride):
-        self.input_ids = []
-        self.target_ids = []
-
         token_ids = tokenizer.encode(txt)
-        for i in range(0, len(token_ids) - max_length, stride):
-            input_chunk = token_ids[i : i+max_length]
-            target_chunk = token_ids[i+1 : i+max_length+1]
-            self.input_ids.append(torch.tensor(input_chunk))
-            self.target_ids.append(torch.tensor(target_chunk))
-
-    def __len__(self):
-        return len(self.input_ids)
-
-    def __getitem__(self, index):
-        return self.input_ids[index], self.target_ids[index]
+        super().__init__(
+            token_ids=token_ids,
+            context_length=max_length,
+            stride=stride,
+        )
 
 def split_token_ids(
         token_ids: Sequence[int],
@@ -44,9 +82,9 @@ def split_token_ids(
     if is_any_split_empty:
         raise ValueError(
             "Empty splits are not allowed: "
-            f"total token count is {len(token_ids)}, "
-            f"training token count is {len(train_tokens)}, "
-            f"validation token count is {len(validation_tokens)}, "
+            f"total token count is {len(token_ids)},\n"
+            f"training token count is {len(train_tokens)},\n "
+            f"validation token count is {len(validation_tokens)},\n "
             f"test token count is {len(test_tokens)}."
         )
 

@@ -9,6 +9,7 @@ topic is a self-contained document with examples and focused references.
 1. [Define observable behavior before implementation](engineering-notes/01-observable-workflows.md)
 2. [Keep installed packages independent of the source checkout](engineering-notes/02-portable-paths.md)
 3. [Split sequential data before creating windows](engineering-notes/03-sequential-data-splits.md)
+16. [Build language-model windows lazily](engineering-notes/16-lazy-token-datasets.md)
 
 ## Packaging and compatibility
 

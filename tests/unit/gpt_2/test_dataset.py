@@ -4,11 +4,12 @@ from typing import Sequence
 
 import pytest
 import tiktoken
+import torch
 
 from gpt_2.config import DataConfig
 from gpt_2.dataset import (
     create_data_loader_v1, download_pt_dataset, split_token_ids,
-    GPTDatasetV1,
+    GPTTokenDataset, GPTDatasetV1,
 )
 
 EXPECTED_DATASET_URL = \
@@ -22,6 +23,12 @@ VALID_DATASET_CONFIG = DataConfig(
     stride=100,
     num_workers=0,
 )
+
+VALID_GPT_TOKEN_DATASET_PARAMS = {
+    "token_ids": range(9),
+    "context_length": 4,
+    "stride": 2
+}
 
 @pytest.fixture
 def gpt_dataset_args():
@@ -186,3 +193,115 @@ def test_split_tokens_handles_sequences():
     assert train_tokens_iter == train_tokens_tuple
     assert validation_tokens_iter == validation_tokens_tuple
     assert test_tokens_iter == test_tokens_tuple
+
+def test_gpt_token_dataset_exact_windows():
+    token_ids = list(range(9))
+    context_length = 4
+    stride=2
+    dataset = GPTTokenDataset(
+        token_ids=token_ids,
+        context_length=context_length,
+        stride=stride
+    )
+    expected_windows = [
+        ([0, 1, 2, 3], [1, 2, 3, 4]),
+        ([2, 3, 4, 5], [3, 4, 5, 6]),
+        ([4, 5, 6, 7], [5, 6, 7, 8]),
+    ]
+
+    assert len(dataset) == len(expected_windows)
+
+    for index, (expected_inputs, expected_targets) in enumerate(expected_windows):
+        inputs, targets = dataset[index]
+
+        assert inputs.tolist() == expected_inputs
+        assert targets.tolist() == expected_targets
+        assert inputs.dtype == torch.long
+        assert targets.dtype == torch.long
+
+@pytest.mark.parametrize(
+        'field, value, message',
+        [
+            ("context_length", 4.0, "context length"),
+            ("context_length", True, "context length"),
+            ("context_length", 0, "context length"),
+            ("context_length", -1, "context length"),
+            ("context_length", 50, "context length"),
+            ("stride", 4.0, "stride"),
+            ("stride", True, "stride"),
+            ("stride", 0, "stride"),
+            ("stride", -1, "stride"),
+        ]
+)
+def test_gpt_token_dataset_rejects_invalid_params(field, value, message):
+    params = VALID_GPT_TOKEN_DATASET_PARAMS | {field : value}
+    with pytest.raises(ValueError, match=message):
+        GPTTokenDataset(**params)
+
+def test_gpt_token_dataset_too_few_tokens():
+    token_ids = list(range(3))
+    context_length = 4
+    stride=1
+
+    with pytest.raises(ValueError, match="length"):
+        GPTTokenDataset(
+            token_ids=token_ids,
+            context_length=context_length,
+            stride=stride
+        )
+
+def test_gpt_token_dataset_one_window():
+    token_ids = list(range(5))
+    context_length = 4
+    stride=1
+    dataset = GPTTokenDataset(
+        token_ids=token_ids,
+        context_length=context_length,
+        stride=stride
+    )
+    assert dataset.n_windows == 1
+
+def test_gpt_token_dataset_and_dataset_v1_produce_same_tokens():
+    txt = "hello this is a test of the tokenizer"
+    tokenizer = tiktoken.get_encoding('gpt2')
+
+    token_ids = tokenizer.encode(txt)
+    context_length = 4
+    stride = 2
+
+    token_dataset = GPTTokenDataset(
+        token_ids=token_ids,
+        context_length=context_length,
+        stride=stride,
+    )
+    v1_dataset = GPTDatasetV1(
+        txt=txt, tokenizer=tokenizer,
+        max_length=context_length, stride=stride,
+    )
+
+    assert len(token_dataset) == len(v1_dataset)
+
+    for index in range(len(token_dataset)):
+        token_inputs, token_targets = token_dataset[index]
+        v1_inputs, v1_targets = v1_dataset[index]
+
+        assert torch.equal(token_inputs, v1_inputs)
+        assert torch.equal(token_targets, v1_targets)
+
+def test_gpt_token_independent_tensor_memory():
+    original = list(range(9))
+    copy = original.copy()
+    context_length = 4
+    stride = 2
+
+    dataset = GPTTokenDataset(
+        token_ids=original,
+        context_length=context_length,
+        stride=stride
+    )
+
+    inputs, targets = dataset[0]
+    inputs[0] = -1
+    targets[0] = -1
+
+    assert original == copy
