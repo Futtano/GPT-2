@@ -1,11 +1,13 @@
 import math
 import urllib.request
-from pathlib import Path
+from typing import Sequence
+
 import pytest
 import tiktoken
+
+from gpt_2.config import DataConfig
 from gpt_2.dataset import (
-    create_data_loader_v1,
-    download_pt_dataset,
+    create_data_loader_v1, download_pt_dataset, split_token_ids,
     GPTDatasetV1,
 )
 
@@ -13,6 +15,13 @@ EXPECTED_DATASET_URL = \
     "https://raw.githubusercontent.com/rasbt/" \
     "LLMs-from-scratch/main/ch02/01_main-chapter-code/" \
     "the-verdict.txt"
+
+VALID_DATASET_CONFIG = DataConfig(
+    train_fraction=0.6,
+    validation_fraction=0.2,
+    stride=100,
+    num_workers=0,
+)
 
 @pytest.fixture
 def gpt_dataset_args():
@@ -106,3 +115,74 @@ def test_create_data_loader_v1(
         inputs.shape[0] == batch_size and
         inputs.shape[1] == max_length
     )
+
+def test_split_token_ids_uses_expected_boundaries():
+    train, validation, test = split_token_ids(
+        list(range(20)),
+        VALID_DATASET_CONFIG,
+    )
+
+    assert train == list(range(12))
+    assert validation == list(range(12, 16))
+    assert test == list(range(16, 20))
+
+@pytest.mark.parametrize(
+        'token_ids',
+        [
+            list(range(50)),
+            range(60),
+            tuple(range(30)),
+        ]
+)
+def test_split_tokens_correctly_split_token_ids(token_ids: Sequence[int]):
+    num_train_tokens = int(len(token_ids) * VALID_DATASET_CONFIG.train_fraction)
+    num_validation_tokens = int(len(token_ids) * VALID_DATASET_CONFIG.validation_fraction)
+    num_test_tokens = len(token_ids) - num_train_tokens - num_validation_tokens
+    train_tokens, validation_tokens, test_tokens = \
+        split_token_ids(token_ids=token_ids, config=VALID_DATASET_CONFIG)
+
+    assert len(train_tokens) == num_train_tokens
+    assert len(validation_tokens) == num_validation_tokens
+    assert len(test_tokens) == num_test_tokens
+
+    joined_tokens = list((*train_tokens, *validation_tokens, *test_tokens))
+    assert joined_tokens == list(token_ids)
+
+    assert train_tokens == list(token_ids[:num_train_tokens])
+    assert validation_tokens == list(
+        token_ids[num_train_tokens:num_train_tokens + num_validation_tokens]
+    )
+    assert test_tokens == list(
+        token_ids[num_train_tokens + num_validation_tokens:]
+    )
+
+def test_split_tokens_copies_token_ids():
+    token_ids = list(range(20))
+    original = token_ids.copy()
+
+    train_tokens, _, _ = split_token_ids(
+        token_ids,
+        VALID_DATASET_CONFIG,
+    )
+
+    train_tokens[0] = -1
+
+    assert token_ids == original
+
+def test_split_tokens_rejects_empty_inputs():
+    with pytest.raises(ValueError, match='Empty'):
+        split_token_ids(token_ids=[], config=VALID_DATASET_CONFIG)
+
+def test_split_tokens_rejects_too_short_inputs():
+    with pytest.raises(ValueError, match='Empty'):
+        split_token_ids(token_ids=[1,2], config=VALID_DATASET_CONFIG)
+
+def test_split_tokens_handles_sequences():
+    train_tokens_iter, validation_tokens_iter, test_tokens_iter = \
+        split_token_ids(token_ids=range(1,10), config=VALID_DATASET_CONFIG)
+    train_tokens_tuple, validation_tokens_tuple, test_tokens_tuple = \
+        split_token_ids(token_ids=tuple(range(1,10)), config=VALID_DATASET_CONFIG)
+
+    assert train_tokens_iter == train_tokens_tuple
+    assert validation_tokens_iter == validation_tokens_tuple
+    assert test_tokens_iter == test_tokens_tuple

@@ -23,15 +23,17 @@ finished.
   device names.
 - Added a frozen, runtime-validated `DataConfig` with explicit split fractions,
   a derived test fraction, stride, and worker count.
+- Added deterministic token-sequence splitting before window construction,
+  including actual-size validation and stable list outputs.
 - Extracted reusable validators for positive integers, non-negative integers,
   bounded finite real numbers, and Booleans.
 - Organized unit tests to mirror the `gpt_2` package.
-- Reached 213 passing tests with warnings treated as errors.
+- Reached 221 passing tests with warnings treated as errors.
 
 ## Still planned
 
 - Load configuration from a user-supplied file.
-- Split data before constructing overlapping token windows.
+- Construct overlapping windows independently within each token split.
 - Expose the pre-training workflow through an installed CLI.
 - Save resolved configuration, metrics, and dataset metadata.
 - Save best-model and resumable training checkpoints.

@@ -40,6 +40,38 @@ Each split has one role:
 Record the source-data identity and exact split offsets with each run. This
 allows later runs to reconstruct the same evaluation boundary.
 
+## Use one deterministic rounding policy
+
+The package first tokenizes the complete source and then splits the token ID
+sequence. For a sequence of `n_tokens`, it computes:
+
+```python
+train_size = int(n_tokens * train_fraction)
+validation_size = int(n_tokens * validation_fraction)
+
+train_end = train_size
+validation_end = train_end + validation_size
+```
+
+The training and validation sizes therefore round down, and the test split
+receives every remaining token. This gives three ordered, non-overlapping
+slices whose concatenation reconstructs the original sequence exactly.
+
+The split function accepts a general `Sequence[int]` and returns three lists.
+Normalizing the output type gives callers one stable contract whether the
+input was a list, tuple, or range. It also ensures a returned list can be
+modified without mutating a list supplied by the caller.
+
+Configuration validation can prove that each requested fraction is positive,
+but only the splitting function knows the actual token count. It rejects a
+computed split when rounding leaves that split empty and reports the total,
+training, validation, and test token counts in the exception.
+
+Tests use a fixed sequence with known boundaries to document the rounding
+policy. They also verify exact reconstruction, input independence, support for
+different sequence implementations, and failures for empty or undersized
+inputs.
+
 ## Further reading
 
 - [scikit-learn: Common pitfalls and recommended practices](https://scikit-learn.org/stable/common_pitfalls.html)
