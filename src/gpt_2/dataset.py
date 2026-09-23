@@ -1,4 +1,5 @@
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
@@ -6,7 +7,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import tiktoken
 
-from gpt_2.config import DataConfig
+from gpt_2.config import ModelConfig, DataConfig, TrainingConfig
 
 class GPTTokenDataset(Dataset):
     def __init__(
@@ -28,11 +29,6 @@ class GPTTokenDataset(Dataset):
             raise ValueError(f"stride must be an integer quantity")
         if stride <= 0:
             raise ValueError("stride must be strictly bigger than zero.")
-        # if stride > self.context_length:
-        #     raise ValueError(
-        #         f"stride must be smaller or equal than context length"
-        #     )
-
         # len(token_ids) - context_length - 1 is the last window's start index
         # divide by stride and add 1 (count the window starting at zero) to
         # obtain the total number of windows
@@ -57,7 +53,7 @@ class GPTTokenDataset(Dataset):
 
 class GPTDatasetV1(GPTTokenDataset):
     def __init__(self, txt, tokenizer, max_length, stride):
-        token_ids = tokenizer.encode(txt)
+        token_ids: list[int] = tokenizer.encode(txt)
         super().__init__(
             token_ids=token_ids,
             context_length=max_length,
@@ -89,6 +85,83 @@ def split_token_ids(
         )
 
     return train_tokens, validation_tokens, test_tokens
+
+@dataclass(frozen=True)
+class DataLoaderBundle:
+    train: DataLoader
+    validation: DataLoader
+    test: DataLoader
+
+def create_data_loaders(
+    token_ids: Sequence[int],
+    *,
+    model_config: ModelConfig,
+    training_config: TrainingConfig,
+    data_config: DataConfig,
+) -> DataLoaderBundle:
+    train_split, validation_split, test_split = \
+        split_token_ids(token_ids=token_ids, config=data_config)
+
+    if len(train_split) < model_config.context_length + 1:
+        raise ValueError(
+            f"train split with {len(train_split)} tokens is too\n"
+            f"short to form a single input-target window of size {model_config.context_length + 1}"
+        )
+    if len(validation_split) < model_config.context_length + 1:
+        raise ValueError(
+                    f"validation split with {len(validation_split)} tokens is too\n"
+                    f"short to form a single input-target window of size {model_config.context_length + 1}"
+                )
+    if len(test_split) < model_config.context_length + 1:
+        raise ValueError(
+                    f"test split with {len(test_split)} tokens is too\n"
+                    f"short to form a single input-target window of size {model_config.context_length + 1}"
+                )
+
+    train_dataset = GPTTokenDataset(
+        token_ids=train_split, context_length=model_config.context_length,
+        stride=data_config.stride,
+    )
+    validation_dataset = GPTTokenDataset(
+        token_ids=validation_split, context_length=model_config.context_length,
+        stride=data_config.stride,
+    )
+    test_dataset = GPTTokenDataset(
+        token_ids=test_split, context_length=model_config.context_length,
+        stride=data_config.stride,
+    )
+
+    generator = torch.Generator()
+    generator.manual_seed(training_config.seed)
+
+    train_dataloader = DataLoader(
+        dataset=train_dataset,
+        batch_size=training_config.batch_size,
+        shuffle=True,
+        generator=generator,
+        num_workers=data_config.num_workers,
+        drop_last=False,
+    )
+    validation_dataloader = DataLoader(
+        dataset=validation_dataset,
+        batch_size=training_config.batch_size,
+        shuffle=False,
+        num_workers=data_config.num_workers,
+        drop_last=False,
+    )
+    test_dataloader = DataLoader(
+        dataset=test_dataset,
+        batch_size=training_config.batch_size,
+        shuffle=False,
+        num_workers=data_config.num_workers,
+        drop_last=False,
+    )
+
+    return DataLoaderBundle(
+        train=train_dataloader,
+        validation=validation_dataloader,
+        test=test_dataloader,
+    )
 
 def create_data_loader_v1(
     txt,

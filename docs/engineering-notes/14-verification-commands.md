@@ -32,6 +32,21 @@ uv run pytest -q -W error --durations=10
 `-W error` promotes unexpected warnings to failures. `--durations=10` reports
 the slowest setup, call, and teardown phases.
 
+## Static analysis
+
+```bash
+# Check only the files involved in the current change
+uv run pyright src/gpt_2/dataset.py tests/unit/gpt_2/test_dataset.py
+
+# Check the complete package and test suite
+uv run pyright
+```
+
+The focused command keeps iteration fast and makes new diagnostics easier to
+attribute. The complete command is the project-wide gate. Pyright is a pinned
+development dependency, and its analysis scope, interpreter, Python version,
+and checking mode are stored in `pyproject.toml`.
+
 ## Diff hygiene
 
 ```bash
@@ -58,5 +73,6 @@ rg -n '[[:blank:]]+$' path/to/new_file.py
 - [pytest command-line reference](https://docs.pytest.org/en/stable/reference/reference.html#command-line-flags)
 - [uv command reference](https://docs.astral.sh/uv/reference/cli/)
 - [Git documentation: `git diff`](https://git-scm.com/docs/git-diff)
+- [Pyright configuration](https://github.com/microsoft/pyright/blob/main/docs/configuration.md)
 
 [Back to the engineering-notes index](../engineering-notes.md)

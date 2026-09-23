@@ -5,11 +5,12 @@ from typing import Sequence
 import pytest
 import tiktoken
 import torch
+from torch.utils.data import RandomSampler, SequentialSampler
 
-from gpt_2.config import DataConfig
+from gpt_2.config import ModelConfig, DataConfig, TrainingConfig
 from gpt_2.dataset import (
     create_data_loader_v1, download_pt_dataset, split_token_ids,
-    GPTTokenDataset, GPTDatasetV1,
+    DataLoaderBundle, GPTTokenDataset, GPTDatasetV1, create_data_loaders,
 )
 
 EXPECTED_DATASET_URL = \
@@ -17,11 +18,32 @@ EXPECTED_DATASET_URL = \
     "LLMs-from-scratch/main/ch02/01_main-chapter-code/" \
     "the-verdict.txt"
 
+VALID_MODEL_CONFIG = ModelConfig(
+    vocab_size=100,
+    context_length=10,
+    emb_dim=24,
+    n_heads=4,
+    n_layers=10,
+    drop_rate=0.2,
+    qkv_bias=False,
+)
+
 VALID_DATASET_CONFIG = DataConfig(
     train_fraction=0.6,
     validation_fraction=0.2,
-    stride=100,
+    stride=2,
     num_workers=0,
+)
+
+VALID_TRAINING_CONFIG = TrainingConfig(
+    batch_size=10,
+    learning_rate=1e-4,
+    num_epochs=5,
+    eval_every_steps=5,
+    eval_batches=10,
+    checkpoint_every_steps=10,
+    seed=123,
+    device='cpu'
 )
 
 VALID_GPT_TOKEN_DATASET_PARAMS = {
@@ -305,3 +327,159 @@ def test_gpt_token_independent_tensor_memory():
     targets[0] = -1
 
     assert original == copy
+
+def test_data_loaders_contain_correct_split():
+    token_ids = list(range(101))
+    loaders = create_data_loaders(
+        token_ids=token_ids,
+        model_config=VALID_MODEL_CONFIG,
+        training_config=VALID_TRAINING_CONFIG,
+        data_config=VALID_DATASET_CONFIG,
+    )
+
+    train_end = int(len(token_ids) * VALID_DATASET_CONFIG.train_fraction)
+    validation_size = int(
+        len(token_ids) * VALID_DATASET_CONFIG.validation_fraction
+    )
+    validation_end = train_end + validation_size
+
+    train_dataset = loaders.train.dataset
+    validation_dataset = loaders.validation.dataset
+    test_dataset = loaders.test.dataset
+
+    assert isinstance(loaders, DataLoaderBundle)
+    assert isinstance(train_dataset, GPTTokenDataset)
+    assert isinstance(validation_dataset, GPTTokenDataset)
+    assert isinstance(test_dataset, GPTTokenDataset)
+    assert train_dataset.token_ids.tolist() == token_ids[:train_end]
+    assert validation_dataset.token_ids.tolist() == token_ids[
+        train_end:validation_end
+    ]
+    assert test_dataset.token_ids.tolist() == token_ids[validation_end:]
+
+
+def test_data_loaders_use_configured_batch_size_and_workers():
+    token_ids = list(range(101))
+
+    loaders = create_data_loaders(
+        token_ids=token_ids,
+        model_config=VALID_MODEL_CONFIG,
+        training_config=VALID_TRAINING_CONFIG,
+        data_config=VALID_DATASET_CONFIG,
+    )
+
+    for loader in (loaders.train, loaders.validation, loaders.test):
+        assert loader.batch_size == VALID_TRAINING_CONFIG.batch_size
+        assert loader.num_workers == VALID_DATASET_CONFIG.num_workers
+
+
+def test_data_loaders_use_correct_samplers():
+    token_ids = list(range(101))
+    loaders = create_data_loaders(
+        token_ids=token_ids,
+        model_config=VALID_MODEL_CONFIG,
+        training_config=VALID_TRAINING_CONFIG,
+        data_config=VALID_DATASET_CONFIG,
+    )
+
+    assert isinstance(loaders.train.sampler, RandomSampler)
+    assert isinstance(loaders.validation.sampler, SequentialSampler)
+    assert isinstance(loaders.test.sampler, SequentialSampler)
+
+
+def test_data_loaders_retain_partial_final_batches():
+    token_ids = list(range(132))
+    loaders = create_data_loaders(
+        token_ids=token_ids,
+        model_config=VALID_MODEL_CONFIG,
+        training_config=VALID_TRAINING_CONFIG,
+        data_config=VALID_DATASET_CONFIG,
+    )
+
+    for loader in (loaders.train, loaders.validation, loaders.test):
+        batches = list(loader)
+        loaded_samples = sum(inputs.shape[0] for inputs, _ in batches)
+        dataset = loader.dataset
+        assert isinstance(dataset, GPTTokenDataset)
+        dataset_size = len(dataset)
+        remainder = dataset_size % VALID_TRAINING_CONFIG.batch_size
+
+        assert remainder > 0
+        assert loaded_samples == dataset_size
+        assert batches[-1][0].shape[0] == remainder
+        assert loader.drop_last is False
+
+
+def test_data_loaders_same_seed_produce_same_first_epoch():
+    token_ids = list(range(210))
+    first = create_data_loaders(
+        token_ids=token_ids,
+        model_config=VALID_MODEL_CONFIG,
+        data_config=VALID_DATASET_CONFIG,
+        training_config=VALID_TRAINING_CONFIG,
+    )
+    second = create_data_loaders(
+        token_ids=token_ids,
+        model_config=VALID_MODEL_CONFIG,
+        data_config=VALID_DATASET_CONFIG,
+        training_config=VALID_TRAINING_CONFIG,
+    )
+
+    first_batches = list(first.train)
+    second_batches = list(second.train)
+    first_epoch_inputs = torch.cat([inputs for inputs, _ in first_batches])
+    second_epoch_inputs = torch.cat([inputs for inputs, _ in second_batches])
+    first_epoch_targets = torch.cat([targets for _, targets in first_batches])
+    second_epoch_targets = torch.cat([targets for _, targets in second_batches])
+
+    assert len(first_batches) > 1
+    assert torch.equal(first_epoch_inputs, second_epoch_inputs)
+    assert torch.equal(first_epoch_targets, second_epoch_targets)
+
+
+def test_evaluation_data_loaders_preserve_window_order():
+    token_ids = list(range(101))
+    loaders = create_data_loaders(
+        token_ids=token_ids,
+        model_config=VALID_MODEL_CONFIG,
+        data_config=VALID_DATASET_CONFIG,
+        training_config=VALID_TRAINING_CONFIG,
+    )
+
+    validation_starts = torch.cat(
+        [inputs[:, 0] for inputs, _ in loaders.validation]
+    ).tolist()
+    test_starts = torch.cat(
+        [inputs[:, 0] for inputs, _ in loaders.test]
+    ).tolist()
+
+    assert validation_starts == [60, 62, 64, 66, 68]
+    assert test_starts == [80, 82, 84, 86, 88, 90]
+
+
+def test_data_loaders_reject_too_short_split():
+    token_ids = list(range(20))
+    with pytest.raises(ValueError, match="validation"):
+        create_data_loaders(
+            token_ids=token_ids,
+            model_config=VALID_MODEL_CONFIG,
+            training_config=VALID_TRAINING_CONFIG,
+            data_config=VALID_DATASET_CONFIG,
+        )
+
+
+def test_data_loaders_produce_expected_shape_and_dtype():
+    token_ids = list(range(101))
+    loaders = create_data_loaders(
+        token_ids=token_ids,
+        model_config=VALID_MODEL_CONFIG,
+        training_config=VALID_TRAINING_CONFIG,
+        data_config=VALID_DATASET_CONFIG,
+    )
+
+    for loader in (loaders.train, loaders.validation, loaders.test):
+        for inputs, targets in loader:
+            assert inputs.shape[-1] == VALID_MODEL_CONFIG.context_length
+            assert targets.shape[-1] == VALID_MODEL_CONFIG.context_length
+            assert inputs.dtype == torch.long
+            assert targets.dtype == torch.long

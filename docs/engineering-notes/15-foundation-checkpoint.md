@@ -27,14 +27,19 @@ finished.
   including actual-size validation and stable list outputs.
 - Added a memory-efficient token dataset that constructs shifted windows lazily
   and retained the text-based dataset API as a compatibility wrapper.
+- Added a named bundle of reproducible training, validation, and test loaders
+  with split-specific sampling and no dropped final batches.
+- Pinned Pyright as a development dependency and configured package and test
+  analysis to use the project environment consistently with Pylance.
 - Extracted reusable validators for positive integers, non-negative integers,
   bounded finite real numbers, and Booleans.
 - Organized unit tests to mirror the `gpt_2` package.
-- Reached 235 passing tests with warnings treated as errors.
+- Reached 243 passing tests with warnings treated as errors.
 
 ## Still planned
 
-- Build separate training, validation, and test loaders from the token splits.
+- Resolve the nine remaining repository-wide static-analysis diagnostics and
+  establish a clean Pyright baseline.
 - Load configuration from a user-supplied file.
 - Expose the pre-training workflow through an installed CLI.
 - Save resolved configuration, metrics, and dataset metadata.
@@ -52,6 +57,7 @@ the best model for generation, and resume training from saved state.
 
 - [Observable workflows](01-observable-workflows.md)
 - [Runtime configuration](12-runtime-configuration.md)
+- [Development environment and static analysis](18-development-environment-and-static-analysis.md)
 - [Verification commands](14-verification-commands.md)
 
 [Back to the engineering-notes index](../engineering-notes.md)

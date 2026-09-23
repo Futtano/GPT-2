@@ -10,6 +10,7 @@ topic is a self-contained document with examples and focused references.
 2. [Keep installed packages independent of the source checkout](engineering-notes/02-portable-paths.md)
 3. [Split sequential data before creating windows](engineering-notes/03-sequential-data-splits.md)
 16. [Build language-model windows lazily](engineering-notes/16-lazy-token-datasets.md)
+17. [Build reproducible loaders from disjoint token splits](engineering-notes/17-reproducible-data-loaders.md)
 
 ## Packaging and compatibility
 
@@ -29,6 +30,7 @@ topic is a self-contained document with examples and focused references.
 
 12. [Validate typed configuration at runtime](engineering-notes/12-runtime-configuration.md)
 13. [Organize tests by scope and package ownership](engineering-notes/13-test-organization.md)
+18. [Make the development environment reproducible](engineering-notes/18-development-environment-and-static-analysis.md)
 
 ## Working reference
 
