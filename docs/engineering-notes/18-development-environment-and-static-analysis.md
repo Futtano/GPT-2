@@ -1,103 +1,143 @@
 # Make the development environment reproducible
 
 Editor feedback is part of the development toolchain. If VS Code, a terminal,
-and continuous integration analyze the project with different interpreters or
-checker settings, developers can see different errors for the same checkout.
-A production-quality project records these choices in version-controlled
-configuration.
+and continuous integration use different tool versions or rules, developers
+can see different results for the same checkout. A production-quality project
+pins the command-line tools and stores their policy in version control.
 
-## Pin the type checker with the development dependencies
+## Give each tool one responsibility
 
-Pylance uses Pyright as its type-checking engine. Adding Pyright to the `uv`
-development dependency group makes the checker version reproducible and gives
-the project a command-line check that does not depend on one editor:
+This project uses:
 
-```toml
+- Ruff for linting and import sorting;
+- Ruff for deterministic code formatting;
+- ty for static type checking and Python language services;
+- pytest for executable behavior.
+
+Ruff and ty are development dependencies, so uv records their versions in
+uv.lock:
+
+~~~toml
 [dependency-groups]
 dev = [
-    "pyright>=1.1.414",
     "pytest>=9.1.1",
     "pytest-mock>=3.15.1",
+    "ruff>=0.16.9",
+    "ty>=0.0.84",
 ]
-```
+~~~
 
-After cloning the repository, create or synchronize the environment with
-`uv sync`. In VS Code, select `.venv/bin/python` as the Python interpreter and
-reload the window after changing environments.
+After cloning or changing dependencies, run uv sync. Commands such as
+uv run ruff and uv run ty then use the locked project environment instead of
+an unrelated global installation.
 
-## Store the analysis scope and Python version
+## Store tool policy in pyproject.toml
 
-The project keeps its Pyright settings in `pyproject.toml`:
+The minimum supported Python version is the correct analysis target. The
+package supports Python 3.12 and 3.13, so Ruff and ty target 3.12 even when the
+developer happens to run Python 3.13.
 
-```toml
-[tool.pyright]
+Ruff owns a deliberately selected set of correctness and maintainability
+rules:
+
+~~~toml
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+src = ["src"]
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "C4", "UP", "SIM", "TRY"]
+ignore = ["TRY003", "TRY004"]
+~~~
+
+Selecting rules explicitly prevents a user-level or parent-directory Ruff
+configuration from silently changing project results. TRY003 and TRY004 are
+excluded because this project keeps useful error messages at the raise site
+and deliberately exposes ValueError consistently for invalid configuration.
+
+ty checks package code and tests while leaving exploratory notebooks outside
+the production gate:
+
+~~~toml
+[tool.ty.environment]
+python-version = "3.12"
+root = ["./src"]
+
+[tool.ty.src]
 include = ["src", "tests"]
 exclude = ["notebooks"]
-venvPath = "."
-venv = ".venv"
-pythonVersion = "3.13"
-typeCheckingMode = "standard"
-```
+~~~
 
-The package and tests are production code and belong in the analysis scope.
-The notebooks are exploratory copies and are excluded so duplicated teaching
-code does not obscure diagnostics in the installed package. Exclusion should
-follow repository ownership boundaries; it should not be used to hide errors
-in production modules.
+uv activates the project environment for command-line checks. ty can also
+discover a .venv directory automatically, so an environment path does not
+need to be hard-coded in pyproject.toml.
 
-`pythonVersion` makes syntax and standard-library checks consistent.
-`venvPath` and `venv` tell command-line Pyright where installed dependencies
-live. The editor should still select the same interpreter so execution,
-completion, and analysis agree.
+## Keep overrides narrow and explained
 
-## Distinguish environment failures from code failures
+Runtime-validation tests intentionally pass values that contradict constructor
+annotations. Those calls are invalid statically because their purpose is to
+prove that runtime validation rejects them. A file-specific ty override
+prevents this expected mismatch from hiding useful diagnostics elsewhere:
 
-Many unrelated `reportMissingImports` errors appearing at once usually mean
-the checker selected the wrong interpreter or could not find its site-packages.
-Confirm that the selected interpreter can import the dependency before changing
-application code:
+~~~toml
+[[tool.ty.overrides]]
+include = ["tests/unit/gpt_2/test_config.py"]
 
-```bash
-.venv/bin/python -c "import torch, tiktoken, pytest"
-```
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+invalid-assignment = "ignore"
+~~~
 
-Once imports resolve, diagnostics about optional values, invalid attribute
-access, or incompatible arguments are normally code-level findings. Fix the
-types or control flow instead of disabling the diagnostic globally.
+Prefer a narrow override or a rule-specific suppression over disabling a rule
+for the whole project. The rest of the test suite remains fully checked.
 
-For example, PyTorch exposes `DataLoader.dataset` through the broad `Dataset`
-base type, which does not statically promise `__len__`. The application knows
-that its factory installs `GPTTokenDataset`, so a runtime assertion both checks
-the invariant and narrows the type for Pyright:
+## Make VS Code use the project tools
 
-```python
-dataset = loader.dataset
-assert isinstance(dataset, GPTTokenDataset)
+Installing extensions enables editor integration, but workspace settings still
+need to select the project environment and define save behavior.
 
-dataset_size = len(dataset)
-```
+The repository settings:
 
-This is preferable to `# type: ignore` because the assertion fails if the
-factory contract changes unexpectedly.
+- select .venv/bin/python;
+- use Ruff as the Python formatter;
+- format files on save;
+- apply explicit Ruff fixes and import sorting on save;
+- prefer pyproject.toml over personal Ruff settings;
+- find Ruff and ty through the selected environment;
+- enable workspace-wide ty diagnostics.
 
-## Use focused checks while iterating
+The ty extension normally disables the Python extension's language server so
+that two Python language servers do not publish duplicate diagnostics. In this
+project, ty provides completion, hover, navigation, and type checking. If a
+team instead keeps Pylance for language features, it should set
+ty.disableLanguageServices to true and use ty only for diagnostics.
 
-Run Pyright on the files being changed before scanning the entire project:
+The extensions file recommends the official ty, Ruff, and Python extensions to
+new contributors. Extension recommendations improve setup but do not replace
+the locked command-line dependencies used by local checks and CI.
 
-```bash
-uv run pyright src/gpt_2/dataset.py tests/unit/gpt_2/test_dataset.py
-uv run pyright
-```
+## Run the same gates locally and in CI
 
-The focused loader check currently reports zero errors. The repository-wide
-check still identifies nine earlier diagnostics in `classification_ft.py`,
-`gpt_download.py`, `instruction_ft.py`, and `sattn.py`. These remain visible as
-a cleanup target rather than being silenced through configuration.
+~~~bash
+uv run ruff check src tests
+uv run ruff format --check src tests
+uv run ty check
+uv run pytest -q -W error
+~~~
+
+Ruff linting, Ruff formatting, and ty type checking currently pass across the
+configured source and test scope. A clean baseline makes every new diagnostic
+attributable to the current change instead of an inherited backlog.
 
 ## Further reading
 
-- [Pyright configuration](https://github.com/microsoft/pyright/blob/main/docs/configuration.md)
-- [VS Code Python environments](https://code.visualstudio.com/docs/python/environments)
-- [Python typing guide: type narrowing](https://typing.python.org/en/latest/guides/type_narrowing.html)
+- [Ruff configuration](https://docs.astral.sh/ruff/configuration/)
+- [Ruff editor settings](https://docs.astral.sh/ruff/editors/settings/)
+- [ty configuration](https://docs.astral.sh/ty/configuration/)
+- [ty editor integration](https://docs.astral.sh/ty/editors/)
+- [ty module discovery](https://docs.astral.sh/ty/modules/)
+- [uv dependency management](https://docs.astral.sh/uv/concepts/projects/dependencies-and-groups/)
 
 [Back to the engineering-notes index](../engineering-notes.md)

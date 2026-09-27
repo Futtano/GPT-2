@@ -32,20 +32,27 @@ uv run pytest -q -W error --durations=10
 `-W error` promotes unexpected warnings to failures. `--durations=10` reports
 the slowest setup, call, and teardown phases.
 
-## Static analysis
+## Linting, formatting, and static analysis
 
 ```bash
-# Check only the files involved in the current change
-uv run pyright src/gpt_2/dataset.py tests/unit/gpt_2/test_dataset.py
+# Check lint rules and formatting without changing files
+uv run ruff check src tests
+uv run ruff format --check src tests
 
-# Check the complete package and test suite
-uv run pyright
+# Apply safe fixes and formatting while developing
+uv run ruff check src tests --fix
+uv run ruff format src tests
+
+# Type-check the configured package and test scope
+uv run ty check
+
+# Focus on one area while investigating diagnostics
+uv run ty check src/gpt_2/dataset.py tests/unit/gpt_2/test_dataset.py
 ```
 
-The focused command keeps iteration fast and makes new diagnostics easier to
-attribute. The complete command is the project-wide gate. Pyright is a pinned
-development dependency, and its analysis scope, interpreter, Python version,
-and checking mode are stored in `pyproject.toml`.
+Ruff and ty are pinned development dependencies. Their source scope, target
+Python version, and rule policy are stored in pyproject.toml so editor,
+terminal, and CI checks agree.
 
 ## Diff hygiene
 
@@ -73,6 +80,7 @@ rg -n '[[:blank:]]+$' path/to/new_file.py
 - [pytest command-line reference](https://docs.pytest.org/en/stable/reference/reference.html#command-line-flags)
 - [uv command reference](https://docs.astral.sh/uv/reference/cli/)
 - [Git documentation: `git diff`](https://git-scm.com/docs/git-diff)
-- [Pyright configuration](https://github.com/microsoft/pyright/blob/main/docs/configuration.md)
+- [Ruff configuration](https://docs.astral.sh/ruff/configuration/)
+- [ty configuration](https://docs.astral.sh/ty/configuration/)
 
 [Back to the engineering-notes index](../engineering-notes.md)

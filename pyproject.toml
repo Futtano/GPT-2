@@ -24,15 +24,40 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "pyright>=1.1.414",
     "pytest>=9.1.1",
     "pytest-mock>=3.15.1",
+    "ruff>=0.16.9",
+    "ty>=0.0.84",
 ]
 
-[tool.pyright]
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+src = ["src"]
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "C4", "UP", "SIM", "TRY"]
+ignore = [
+    # Long exception messages are clearer when constructed at the raise site.
+    "TRY003",
+    # Configuration validation deliberately exposes ValueError consistently.
+    "TRY004",
+]
+
+[tool.ty.environment]
+python-version = "3.12"
+root = ["./src"]
+
+[tool.ty.src]
 include = ["src", "tests"]
 exclude = ["notebooks"]
-venvPath = "."
-venv = ".venv"
-pythonVersion = "3.13"
-typeCheckingMode = "standard"
+
+# These tests deliberately violate constructor annotations to exercise runtime
+# validation. Keep the override local to that boundary-test module.
+[[tool.ty.overrides]]
+include = ["tests/unit/gpt_2/test_config.py"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+invalid-assignment = "ignore"

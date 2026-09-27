@@ -1,31 +1,29 @@
+from dataclasses import asdict
+
 import pytest
 import torch
 
-from dataclasses import asdict
-
 from gpt_2.config import ModelConfig
-from gpt_2.model import (
-    LayerNorm, GELU, FeedForward,
-    TransformerBlock, GPTModel
+from gpt_2.model import GELU, FeedForward, GPTModel, LayerNorm, TransformerBlock
+
+TEST_GPT_CONFIG = ModelConfig(
+    vocab_size=128,
+    context_length=16,
+    emb_dim=16,
+    n_heads=4,
+    n_layers=1,
+    drop_rate=0.0,
+    qkv_bias=False,
 )
 
-TEST_GPT_CONFIG = ModelConfig(**{
-    "vocab_size": 128,
-    "context_length": 16,
-    "emb_dim": 16,
-    "n_heads": 4,
-    "n_layers": 1,
-    "drop_rate": 0.0,
-    "qkv_bias": False,
-})
 
 @pytest.mark.parametrize(
-    'input',
+    "input",
     [
         torch.randn(2, 10, 15),
         torch.randn(3, 10, 20),
         torch.randn(1, 10, 10),
-    ]
+    ],
 )
 def test_layer_norm(input):
     n_dim = input.shape[-1]
@@ -46,12 +44,12 @@ def test_layer_norm(input):
 
 
 @pytest.mark.parametrize(
-    'input',
+    "input",
     [
         torch.randn(2, 10, 15),
         torch.randn(3, 10, 20),
         torch.randn(1, 10, 10),
-    ]
+    ],
 )
 def test_gelu(input):
     gelu = GELU()
@@ -63,26 +61,28 @@ def test_gelu(input):
     actual = gelu(input)
     assert torch.allclose(actual, expected, atol=1e-3)
 
+
 @pytest.mark.parametrize(
-    'input',
+    "input",
     [
         (torch.randn(2, 10, 15)),
         (torch.randn(3, 10, 20)),
         (torch.randn(1, 10, 10)),
-    ]
+    ],
 )
 def test_feed_forward(input):
     ff = FeedForward(input.shape[-1])
     output = ff(input)
     assert output.shape == input.shape
 
+
 @pytest.mark.parametrize(
-    'input',
+    "input",
     [
         (torch.randn(2, 10, TEST_GPT_CONFIG.emb_dim)),
         (torch.randn(3, 10, TEST_GPT_CONFIG.emb_dim)),
         (torch.randn(1, 10, TEST_GPT_CONFIG.emb_dim)),
-    ]
+    ],
 )
 def test_transformer_block(input):
     tb = TransformerBlock(TEST_GPT_CONFIG)
@@ -91,17 +91,18 @@ def test_transformer_block(input):
 
 
 @pytest.mark.parametrize(
-    'input',
+    "input",
     [
         (torch.randint(low=0, high=TEST_GPT_CONFIG.vocab_size, size=(2, 10))),
         (torch.randint(low=0, high=TEST_GPT_CONFIG.vocab_size, size=(3, 10))),
         (torch.randint(low=0, high=TEST_GPT_CONFIG.vocab_size, size=(1, 10))),
-    ]
+    ],
 )
 def test_gpt_model(input):
     gpt = GPTModel(TEST_GPT_CONFIG)
     output = gpt(input)
     assert output.shape == (input.shape[0], input.shape[1], TEST_GPT_CONFIG.vocab_size)
+
 
 def test_gpt_model_accepts_mapping():
     model = GPTModel(asdict(TEST_GPT_CONFIG))

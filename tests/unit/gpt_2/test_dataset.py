@@ -128,7 +128,7 @@ def test_gpt_dataset(gpt_dataset_args, max_length, stride):
 
     # Check if targets are inputs shifted by one
     inputs, targets = dataset[0]
-    assert (targets[:-1] == inputs[1:]).all() == True
+    assert (targets[:-1] == inputs[1:]).all()
 
 
 @pytest.mark.parametrize(
@@ -275,7 +275,7 @@ def test_gpt_token_dataset_exact_windows():
 def test_gpt_token_dataset_rejects_invalid_params(field, value, message):
     params = VALID_GPT_TOKEN_DATASET_PARAMS | {field: value}
     with pytest.raises(ValueError, match=message):
-        GPTTokenDataset(**params) # type: ignore
+        GPTTokenDataset(**params)  # ty: ignore[invalid-argument-type]
 
 
 def test_gpt_token_dataset_too_few_tokens():

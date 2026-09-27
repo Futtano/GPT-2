@@ -12,8 +12,7 @@ from gpt_2.config import DataConfig, ModelConfig, TrainingConfig
 
 class GPTTokenDataset(Dataset):
     def __init__(
-            self, token_ids: Sequence[int], context_length: int,
-            stride: int
+        self, token_ids: Sequence[int], context_length: int, stride: int
     ) -> None:
         super().__init__()
 
@@ -23,7 +22,7 @@ class GPTTokenDataset(Dataset):
             raise ValueError("context length must be strictly bigger than zero.")
         if context_length > len(token_ids) - 1:
             raise ValueError(
-                f"number of dataset tokens ({len(token_ids)})\n" \
+                f"number of dataset tokens ({len(token_ids)})\n"
                 f"is not sufficient for a context length of size {context_length}."
             )
         if not isinstance(stride, int) or isinstance(stride, bool):
@@ -36,21 +35,20 @@ class GPTTokenDataset(Dataset):
         self.token_ids = torch.tensor(token_ids, dtype=torch.long)
         self.context_length = context_length
         self.stride = stride
-        self.n_windows = (
-            (len(token_ids) - context_length - 1) // stride
-        ) + 1
+        self.n_windows = ((len(token_ids) - context_length - 1) // stride) + 1
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         start = index * self.stride
         stop = start + self.context_length
 
         inputs = self.token_ids[start:stop]
-        targets = self.token_ids[start + 1:stop + 1]
+        targets = self.token_ids[start + 1 : stop + 1]
 
         return inputs, targets
 
     def __len__(self) -> int:
         return self.n_windows
+
 
 class GPTDatasetV1(GPTTokenDataset):
     def __init__(self, txt, tokenizer, max_length, stride):
@@ -61,9 +59,10 @@ class GPTDatasetV1(GPTTokenDataset):
             stride=stride,
         )
 
+
 def split_token_ids(
-        token_ids: Sequence[int],
-        config: DataConfig,
+    token_ids: Sequence[int],
+    config: DataConfig,
 ) -> tuple[list[int], list[int], list[int]]:
     train_size = int(len(token_ids) * config.train_fraction)
     validation_size = int(len(token_ids) * config.validation_fraction)
@@ -71,11 +70,13 @@ def split_token_ids(
     train_end = train_size
     validation_end = train_end + validation_size
 
-    train_tokens = list(token_ids[: train_end])
-    validation_tokens = list(token_ids[train_end: validation_end])
+    train_tokens = list(token_ids[:train_end])
+    validation_tokens = list(token_ids[train_end:validation_end])
     test_tokens = list(token_ids[validation_end:])
 
-    is_any_split_empty =  not len(train_tokens) or not len(validation_tokens) or not len(test_tokens)
+    is_any_split_empty = (
+        not len(train_tokens) or not len(validation_tokens) or not len(test_tokens)
+    )
     if is_any_split_empty:
         raise ValueError(
             "Empty splits are not allowed: "
@@ -87,11 +88,13 @@ def split_token_ids(
 
     return train_tokens, validation_tokens, test_tokens
 
+
 @dataclass(frozen=True)
 class DataLoaderBundle:
     train: DataLoader
     validation: DataLoader
     test: DataLoader
+
 
 def create_data_loaders(
     token_ids: Sequence[int],
@@ -100,8 +103,9 @@ def create_data_loaders(
     training_config: TrainingConfig,
     data_config: DataConfig,
 ) -> DataLoaderBundle:
-    train_split, validation_split, test_split = \
-        split_token_ids(token_ids=token_ids, config=data_config)
+    train_split, validation_split, test_split = split_token_ids(
+        token_ids=token_ids, config=data_config
+    )
 
     if len(train_split) < model_config.context_length + 1:
         raise ValueError(
@@ -110,25 +114,28 @@ def create_data_loaders(
         )
     if len(validation_split) < model_config.context_length + 1:
         raise ValueError(
-                    f"validation split with {len(validation_split)} tokens is too\n"
-                    f"short to form a single input-target window of size {model_config.context_length + 1}"
-                )
+            f"validation split with {len(validation_split)} tokens is too\n"
+            f"short to form a single input-target window of size {model_config.context_length + 1}"
+        )
     if len(test_split) < model_config.context_length + 1:
         raise ValueError(
-                    f"test split with {len(test_split)} tokens is too\n"
-                    f"short to form a single input-target window of size {model_config.context_length + 1}"
-                )
+            f"test split with {len(test_split)} tokens is too\n"
+            f"short to form a single input-target window of size {model_config.context_length + 1}"
+        )
 
     train_dataset = GPTTokenDataset(
-        token_ids=train_split, context_length=model_config.context_length,
+        token_ids=train_split,
+        context_length=model_config.context_length,
         stride=data_config.stride,
     )
     validation_dataset = GPTTokenDataset(
-        token_ids=validation_split, context_length=model_config.context_length,
+        token_ids=validation_split,
+        context_length=model_config.context_length,
         stride=data_config.stride,
     )
     test_dataset = GPTTokenDataset(
-        token_ids=test_split, context_length=model_config.context_length,
+        token_ids=test_split,
+        context_length=model_config.context_length,
         stride=data_config.stride,
     )
 
@@ -164,6 +171,7 @@ def create_data_loaders(
         test=test_dataloader,
     )
 
+
 def create_data_loader_v1(
     txt,
     batch_size=4,
@@ -173,18 +181,17 @@ def create_data_loader_v1(
     drop_last=True,
     num_workers=0,
 ):
-    tokenizer = tiktoken.get_encoding('gpt2')
-    dataset = GPTDatasetV1(
-        txt, tokenizer, max_length, stride
-    )
+    tokenizer = tiktoken.get_encoding("gpt2")
+    dataset = GPTDatasetV1(txt, tokenizer, max_length, stride)
     dataloader = DataLoader(
-        dataset, 
+        dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         drop_last=drop_last,
         num_workers=num_workers,
     )
     return dataloader
+
 
 def download_pt_dataset(file_path="data/the-verdict.txt"):
     if Path(file_path).exists():
@@ -197,6 +204,7 @@ def download_pt_dataset(file_path="data/the-verdict.txt"):
     )
     urllib.request.urlretrieve(url, file_path)
     return file_path
+
 
 def get_root():
     return Path.cwd()

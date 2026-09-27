@@ -10,7 +10,7 @@ from typing import Any, Literal
 def _validate_positive_int(name: str, value: object) -> None:
     if not isinstance(value, int) or isinstance(value, bool):
         # Configuration callers handle invalid values through one error type.
-        raise ValueError(f"{name} must be an integer.")  # noqa: TRY004
+        raise ValueError(f"{name} must be an integer.")
     if value <= 0:
         raise ValueError(f"{name} must be greater than zero.")
 
@@ -18,7 +18,7 @@ def _validate_positive_int(name: str, value: object) -> None:
 def _validate_nonnegative_int(name: str, value: object) -> None:
     if not isinstance(value, int) or isinstance(value, bool):
         # Configuration callers handle invalid values through one error type.
-        raise ValueError(f"{name} must be an integer.")  # noqa: TRY004
+        raise ValueError(f"{name} must be an integer.")
     if value < 0:
         raise ValueError(f"{name} must be non-negative.")
 
@@ -33,7 +33,7 @@ def _validate_finite_bounded_float(
 ) -> None:
     if isinstance(value, bool) or not isinstance(value, Real):
         # Configuration callers handle invalid values through one error type.
-        raise ValueError(f"{name} must be a real number.")  # noqa: TRY004
+        raise ValueError(f"{name} must be a real number.")
 
     try:
         numeric_value = float(value)
@@ -193,7 +193,7 @@ def _require_section(
 
     if not isinstance(section, Mapping):
         # Parsing exposes one error type for all invalid configuration content.
-        raise ValueError(f"[{name}] must be a TOML table.")  # noqa: TRY004
+        raise ValueError(f"[{name}] must be a TOML table.")
 
     return section
 

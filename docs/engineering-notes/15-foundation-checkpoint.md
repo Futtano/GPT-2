@@ -29,18 +29,18 @@ finished.
   and retained the text-based dataset API as a compatibility wrapper.
 - Added a named bundle of reproducible training, validation, and test loaders
   with split-specific sampling and no dropped final batches.
-- Pinned Pyright as a development dependency and configured package and test
-  analysis to use the project environment consistently with Pylance.
+- Pinned Ruff and ty as development dependencies, configured VS Code to use
+  the project environment, and stored lint, format, and type policy in
+  pyproject.toml.
+- Established clean Ruff lint, Ruff format, and ty type-checking baselines.
+- Added strict TOML loading into a frozen, validated RunConfig.
 - Extracted reusable validators for positive integers, non-negative integers,
   bounded finite real numbers, and Booleans.
 - Organized unit tests to mirror the `gpt_2` package.
-- Reached 243 passing tests with warnings treated as errors.
+- Reached 271 passing tests with warnings treated as errors.
 
 ## Still planned
 
-- Resolve the nine remaining repository-wide static-analysis diagnostics and
-  establish a clean Pyright baseline.
-- Load configuration from a user-supplied file.
 - Expose the pre-training workflow through an installed CLI.
 - Save resolved configuration, metrics, and dataset metadata.
 - Save best-model and resumable training checkpoints.
