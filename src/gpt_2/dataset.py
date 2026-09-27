@@ -1,13 +1,14 @@
 import urllib.request
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
 
-import torch
-from torch.utils.data import Dataset, DataLoader
 import tiktoken
+import torch
+from torch.utils.data import DataLoader, Dataset
 
-from gpt_2.config import ModelConfig, DataConfig, TrainingConfig
+from gpt_2.config import DataConfig, ModelConfig, TrainingConfig
+
 
 class GPTTokenDataset(Dataset):
     def __init__(
@@ -17,7 +18,7 @@ class GPTTokenDataset(Dataset):
         super().__init__()
 
         if not isinstance(context_length, int) or isinstance(context_length, bool):
-            raise ValueError(f"context length must be an integer quantity")
+            raise ValueError("context length must be an integer quantity")
         if context_length <= 0:
             raise ValueError("context length must be strictly bigger than zero.")
         if context_length > len(token_ids) - 1:
@@ -26,7 +27,7 @@ class GPTTokenDataset(Dataset):
                 f"is not sufficient for a context length of size {context_length}."
             )
         if not isinstance(stride, int) or isinstance(stride, bool):
-            raise ValueError(f"stride must be an integer quantity")
+            raise ValueError("stride must be an integer quantity")
         if stride <= 0:
             raise ValueError("stride must be strictly bigger than zero.")
         # len(token_ids) - context_length - 1 is the last window's start index
