@@ -1,20 +1,27 @@
 import math
-from numbers import Real
-from typing import Any, Literal
+import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass
+from numbers import Real
+from pathlib import Path
+from typing import Any, Literal
+
 
 def _validate_positive_int(name: str, value: object) -> None:
     if not isinstance(value, int) or isinstance(value, bool):
-        raise ValueError(f"{name} must be an integer.")
+        # Configuration callers handle invalid values through one error type.
+        raise ValueError(f"{name} must be an integer.")  # noqa: TRY004
     if value <= 0:
         raise ValueError(f"{name} must be greater than zero.")
 
+
 def _validate_nonnegative_int(name: str, value: object) -> None:
     if not isinstance(value, int) or isinstance(value, bool):
-        raise ValueError(f"{name} must be an integer.")
+        # Configuration callers handle invalid values through one error type.
+        raise ValueError(f"{name} must be an integer.")  # noqa: TRY004
     if value < 0:
         raise ValueError(f"{name} must be non-negative.")
+
 
 def _validate_finite_bounded_float(
     name: str,
@@ -25,7 +32,8 @@ def _validate_finite_bounded_float(
     inclusive_upper: bool,
 ) -> None:
     if isinstance(value, bool) or not isinstance(value, Real):
-        raise ValueError(f"{name} must be a real number.")
+        # Configuration callers handle invalid values through one error type.
+        raise ValueError(f"{name} must be a real number.")  # noqa: TRY004
 
     try:
         numeric_value = float(value)
@@ -44,9 +52,11 @@ def _validate_finite_bounded_float(
     if above_upper or (numeric_value == upper and not inclusive_upper):
         raise ValueError(f"{name} is above its permitted range.")
 
+
 def _validate_boolean(name: str, value: object) -> None:
     if value is not True and value is not False:
         raise ValueError(f"{name} must be either True or False.")
+
 
 @dataclass(frozen=True)
 class ModelConfig:
@@ -66,9 +76,12 @@ class ModelConfig:
         _validate_positive_int("n_heads", self.n_heads)
         _validate_positive_int("n_layers", self.n_layers)
         _validate_finite_bounded_float(
-            'drop_rate', self.drop_rate,
-            lower=0.0, upper=1.0,
-            inclusive_lower=True, inclusive_upper=True
+            "drop_rate",
+            self.drop_rate,
+            lower=0.0,
+            upper=1.0,
+            inclusive_lower=True,
+            inclusive_upper=True,
         )
 
         _validate_boolean("qkv_bias", self.qkv_bias)
@@ -77,8 +90,10 @@ class ModelConfig:
         if self.emb_dim % self.n_heads != 0:
             raise ValueError(f"{self.emb_dim=} must be divisible by {self.n_heads=}.")
 
-DeviceName = Literal['auto', 'cpu', 'cuda', 'mps']
+
+DeviceName = Literal["auto", "cpu", "cuda", "mps"]
 ALLOWED_DEVICES = ("auto", "cpu", "cuda", "mps")
+
 
 @dataclass(frozen=True)
 class TrainingConfig:
@@ -93,20 +108,26 @@ class TrainingConfig:
 
     def __post_init__(self) -> None:
         # Sanity checks
-        _validate_positive_int('batch_size', self.batch_size)
-        _validate_positive_int('num_epochs', self.num_epochs)
-        _validate_positive_int('eval_every_steps', self.eval_every_steps)
-        _validate_positive_int('eval_batches', self.eval_batches)
-        _validate_positive_int('checkpoint_every_steps', self.checkpoint_every_steps)
-        _validate_nonnegative_int('seed', self.seed)
+        _validate_positive_int("batch_size", self.batch_size)
+        _validate_positive_int("num_epochs", self.num_epochs)
+        _validate_positive_int("eval_every_steps", self.eval_every_steps)
+        _validate_positive_int("eval_batches", self.eval_batches)
+        _validate_positive_int("checkpoint_every_steps", self.checkpoint_every_steps)
+        _validate_nonnegative_int("seed", self.seed)
         _validate_finite_bounded_float(
-            'learning_rate', self.learning_rate,
-            lower=0.0, upper=float('inf'),
-            inclusive_lower=False, inclusive_upper=False
+            "learning_rate",
+            self.learning_rate,
+            lower=0.0,
+            upper=float("inf"),
+            inclusive_lower=False,
+            inclusive_upper=False,
         )
 
         if self.device not in ALLOWED_DEVICES:
-            raise ValueError(f"device must be one of {ALLOWED_DEVICES}; got {self.device!r}.")
+            raise ValueError(
+                f"device must be one of {ALLOWED_DEVICES}; got {self.device!r}."
+            )
+
 
 @dataclass(frozen=True)
 class DataConfig:
@@ -121,14 +142,20 @@ class DataConfig:
 
     def __post_init__(self) -> None:
         _validate_finite_bounded_float(
-            "train_fraction", self.train_fraction,
-            lower=0.0, upper=1.0,
-            inclusive_lower=False, inclusive_upper=False,
+            "train_fraction",
+            self.train_fraction,
+            lower=0.0,
+            upper=1.0,
+            inclusive_lower=False,
+            inclusive_upper=False,
         )
         _validate_finite_bounded_float(
-            "validation_fraction", self.validation_fraction,
-            lower=0.0, upper=1.0,
-            inclusive_lower=False, inclusive_upper=False,
+            "validation_fraction",
+            self.validation_fraction,
+            lower=0.0,
+            upper=1.0,
+            inclusive_lower=False,
+            inclusive_upper=False,
         )
 
         if self.train_fraction + self.validation_fraction >= 1.0:
@@ -137,11 +164,79 @@ class DataConfig:
                 "so test_fraction is positive."
             )
 
-        _validate_positive_int('stride', self.stride)
-        _validate_nonnegative_int('num_workers', self.num_workers)
+        _validate_positive_int("stride", self.stride)
+        _validate_nonnegative_int("num_workers", self.num_workers)
+
 
 def ensure_model_config(config: ModelConfig | Mapping[str, Any]) -> ModelConfig:
     if isinstance(config, ModelConfig):
         return config
 
     return ModelConfig(**config)
+
+
+@dataclass(frozen=True)
+class RunConfig:
+    model: ModelConfig
+    data: DataConfig
+    training: TrainingConfig
+
+
+REQUIRED_SECTIONS = frozenset({"model", "training", "data"})
+
+
+def _require_section(
+    raw: Mapping[str, Any],
+    name: str,
+) -> Mapping[str, Any]:
+    section = raw[name]
+
+    if not isinstance(section, Mapping):
+        # Parsing exposes one error type for all invalid configuration content.
+        raise ValueError(f"[{name}] must be a TOML table.")  # noqa: TRY004
+
+    return section
+
+
+def load_run_config(path: str | Path) -> RunConfig:
+    with open(file=path, mode="rb") as file:
+        raw = tomllib.load(file)
+
+    return parse_run_config(raw)
+
+
+def parse_run_config(raw: Mapping[str, Any]) -> RunConfig:
+    actual_sections = set(raw)
+    missing_sections = REQUIRED_SECTIONS - actual_sections
+    unknown_sections = actual_sections - REQUIRED_SECTIONS
+
+    if missing_sections:
+        raise ValueError(f"Missing configuration sections: {sorted(missing_sections)}.")
+
+    if unknown_sections:
+        raise ValueError(f"Unknown configuration sections: {sorted(unknown_sections)}.")
+
+    model_values = _require_section(raw, "model")
+    training_values = _require_section(raw, "training")
+    data_values = _require_section(raw, "data")
+
+    try:
+        model = ModelConfig(**model_values)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"Invalid [model] configuration: {error}") from error
+
+    try:
+        training = TrainingConfig(**training_values)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"Invalid [training] configuration: {error}") from error
+
+    try:
+        data = DataConfig(**data_values)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"Invalid [data] configuration: {error}") from error
+
+    return RunConfig(
+        model=model,
+        training=training,
+        data=data,
+    )
