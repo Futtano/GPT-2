@@ -13,8 +13,10 @@ This project currently contains a from-scratch GPT-2 implementation and the note
 
 It is a learning project for people who want to explore LLM training and fine-tuning without access to expensive GPU clusters or large datasets.
 
-The [engineering notes](docs/engineering-notes.md) collect the packaging,
-testing, and ML workflow lessons learned while developing the project.
+The [project roadmap](docs/project-roadmap.md) tracks current progress and
+upcoming milestones. The [engineering notes](docs/engineering-notes.md)
+collect the packaging, testing, and ML workflow lessons learned while
+developing the project.
 
 ## First supported workflow (TODO)
 

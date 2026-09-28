@@ -3,14 +3,16 @@
 These notes record the engineering lessons learned while turning this
 repository from GPT-2 experiments into a reproducible Python package. Each
 topic is a self-contained document with examples and focused references.
+Current implementation status and upcoming milestones live in the
+[project roadmap](project-roadmap.md).
 
 ## Workflow and data
 
 1. [Define observable behavior before implementation](engineering-notes/01-observable-workflows.md)
 2. [Keep installed packages independent of the source checkout](engineering-notes/02-portable-paths.md)
 3. [Split sequential data before creating windows](engineering-notes/03-sequential-data-splits.md)
-16. [Build language-model windows lazily](engineering-notes/16-lazy-token-datasets.md)
-17. [Build reproducible loaders from disjoint token splits](engineering-notes/17-reproducible-data-loaders.md)
+15. [Build language-model windows lazily](engineering-notes/15-lazy-token-datasets.md)
+16. [Build reproducible loaders from disjoint token splits](engineering-notes/16-reproducible-data-loaders.md)
 
 ## Packaging and compatibility
 
@@ -25,18 +27,18 @@ topic is a self-contained document with examples and focused references.
 9. [Handle PyTorch tensor copying explicitly](engineering-notes/09-pytorch-tensor-copying.md)
 10. [Keep unit-test models tiny](engineering-notes/10-fast-ml-tests.md)
 11. [Write assertions that can fail meaningfully](engineering-notes/11-effective-assertions.md)
+19. [Test typed boundaries without hiding errors](engineering-notes/19-typed-negative-tests-and-mocking.md)
 
 ## Configuration and project structure
 
 12. [Validate typed configuration at runtime](engineering-notes/12-runtime-configuration.md)
 13. [Organize tests by scope and package ownership](engineering-notes/13-test-organization.md)
-18. [Make the development environment reproducible](engineering-notes/18-development-environment-and-static-analysis.md)
-19. [Load typed run configuration from TOML](engineering-notes/19-typed-toml-configuration.md)
+17. [Make the development environment reproducible](engineering-notes/17-development-environment-and-static-analysis.md)
+18. [Load typed run configuration from TOML](engineering-notes/18-typed-toml-configuration.md)
 
 ## Working reference
 
 14. [Verification commands](engineering-notes/14-verification-commands.md)
-15. [Foundation checkpoint](engineering-notes/15-foundation-checkpoint.md)
 
 Update the relevant topic when a decision changes. Add a new document when a
 completed section introduces a distinct engineering concept.
