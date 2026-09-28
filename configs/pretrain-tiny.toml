@@ -1,0 +1,24 @@
+[model]
+vocab_size = 50257
+context_length = 32
+emb_dim = 64
+n_heads = 4
+n_layers = 2
+drop_rate = 0.0
+qkv_bias = false
+
+[training]
+batch_size = 2
+learning_rate = 0.0004
+num_epochs = 1
+eval_every_steps = 5
+eval_batches = 2
+checkpoint_every_steps = 10
+seed = 123
+device = "cpu"
+
+[data]
+train_fraction = 0.8
+validation_fraction = 0.1
+stride = 32
+num_workers = 0
