@@ -23,6 +23,13 @@ def _validate_nonnegative_int(name: str, value: object) -> None:
         raise ValueError(f"{name} must be non-negative.")
 
 
+def _validate_nonnegative_int_with_high_bound(name: str, value: int, high: int) -> None:
+    _validate_nonnegative_int(name=name, value=value)
+
+    if value >= high:
+        raise ValueError(f"{name} must be strictly lower than {high}.")
+
+
 def _validate_finite_bounded_float(
     name: str,
     value: object,
@@ -113,7 +120,7 @@ class TrainingConfig:
         _validate_positive_int("eval_every_steps", self.eval_every_steps)
         _validate_positive_int("eval_batches", self.eval_batches)
         _validate_positive_int("checkpoint_every_steps", self.checkpoint_every_steps)
-        _validate_nonnegative_int("seed", self.seed)
+        _validate_nonnegative_int_with_high_bound("seed", self.seed, high=2**32)
         _validate_finite_bounded_float(
             "learning_rate",
             self.learning_rate,

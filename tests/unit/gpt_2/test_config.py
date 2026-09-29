@@ -217,6 +217,7 @@ def test_ensure_model_config_validates_mapping():
         (80, 7e-4, 2, 8, 3, 58, 4, "cpu"),
         (90, 18e-4, 1, 7, 10, 59, 5, "cuda"),
         (100, 9e-4, 90, 25, 5, 60, 123, "auto"),
+        (100, 9e-4, 90, 25, 5, 60, 2**32 - 1, "auto"),
     ],
 )
 def test_accepts_valid_training_config(
@@ -259,6 +260,7 @@ def test_accepts_valid_training_config(
         ("seed", -1, "seed"),
         ("seed", float("inf"), "seed"),
         ("seed", float("-inf"), "seed"),
+        ("seed", 2**32, "seed"),
         ("seed", -1.0, "seed"),
         ("seed", True, "seed"),
         ("eval_every_steps", -2, "eval_every_steps"),

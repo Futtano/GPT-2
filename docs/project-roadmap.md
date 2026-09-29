@@ -33,11 +33,13 @@ Completed in this stage:
   creates a fresh output directory without leaving partial artifacts on
   failure.
 - Added hermetic unit tests for the parser and preparation boundary.
+- Added explicit and automatic CPU, CUDA, and MPS device resolution with
+  availability checks and deterministic fallback priority.
+- Added bounded, deterministic seeding for Python, NumPy, and PyTorch random
+  sources.
 
 Currently implementing:
 
-- Resolve explicit and automatic CPU, CUDA, and MPS device selection.
-- Seed every random source used by the training workflow.
 - Attach resolved runtime state to the prepared run.
 
 ## Next milestones
