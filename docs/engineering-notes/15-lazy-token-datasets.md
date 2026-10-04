@@ -15,7 +15,7 @@ start = index * stride
 stop = start + context_length
 
 inputs = token_ids[start:stop]
-targets = token_ids[start + 1:stop + 1]
+targets = token_ids[start + 1 : stop + 1]
 ```
 
 The two slices differ by one position, which defines next-token prediction.
@@ -29,9 +29,7 @@ and one additional token at the end of the shifted target. After rejecting
 short sequences, the number of complete windows is:
 
 ```python
-num_windows = (
-    (len(token_ids) - context_length - 1) // stride
-) + 1
+num_windows = ((len(token_ids) - context_length - 1) // stride) + 1
 ```
 
 The subtraction finds the last valid starting offset, floor division counts

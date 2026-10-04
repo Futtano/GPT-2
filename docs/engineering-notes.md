@@ -35,10 +35,12 @@ Current implementation status and upcoming milestones live in the
 13. [Organize tests by scope and package ownership](engineering-notes/13-test-organization.md)
 17. [Make the development environment reproducible](engineering-notes/17-development-environment-and-static-analysis.md)
 18. [Load typed run configuration from TOML](engineering-notes/18-typed-toml-configuration.md)
+21. [Resolve runtime state and order preparation](engineering-notes/21-resolved-runtime-and-preparation.md)
 
 ## Working reference
 
 14. [Verification commands](engineering-notes/14-verification-commands.md)
+20. [Enforce checks with pre-commit and CI](engineering-notes/20-pre-commit-and-continuous-integration.md)
 
 Update the relevant topic when a decision changes. Add a new document when a
 completed section introduces a distinct engineering concept.

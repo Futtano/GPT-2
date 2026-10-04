@@ -1,4 +1,5 @@
 import random
+from dataclasses import dataclass
 
 import numpy as np
 import torch
@@ -32,3 +33,9 @@ def seed_random_sources(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+
+
+@dataclass(frozen=True)
+class ResolvedRuntime:
+    device: torch.device
+    seed: int

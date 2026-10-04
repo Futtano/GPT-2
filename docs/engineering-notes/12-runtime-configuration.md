@@ -100,6 +100,7 @@ how that network is optimized and evaluated:
 ```python
 DeviceName = Literal["auto", "cpu", "cuda", "mps"]
 
+
 @dataclass(frozen=True)
 class TrainingConfig:
     batch_size: int

@@ -1,7 +1,12 @@
+from pathlib import Path
+
 import pytest
+import torch
+from pytest_mock import MockerFixture
 
 from gpt_2.cli import PretrainArguments
 from gpt_2.config import DataConfig, ModelConfig, RunConfig, TrainingConfig
+from gpt_2.runtime import ResolvedRuntime
 from gpt_2.workflow import PreparedPretrainRun, prepare_pretrain_run
 
 
@@ -36,7 +41,9 @@ def run_config() -> RunConfig:
     )
 
 
-def test_prepare_pretrain_run_valid_input(tmp_path, mocker, run_config):
+def test_prepare_pretrain_run_valid_input(
+    tmp_path: Path, mocker: MockerFixture, run_config: RunConfig
+):
     config_file = tmp_path / "pretrain-tiny.toml"
     input_file = tmp_path / "training.txt"
     outputs_dir = tmp_path / "run-001"
@@ -48,6 +55,17 @@ def test_prepare_pretrain_run_valid_input(tmp_path, mocker, run_config):
         "gpt_2.workflow.load_run_config",
         autospec=True,
         return_value=run_config,
+    )
+
+    mock_resolve_device = mocker.patch(
+        "gpt_2.workflow.resolve_device",
+        autospec=True,
+        return_value=torch.device("cuda"),
+    )
+
+    mock_seed_random_sources = mocker.patch(
+        "gpt_2.workflow.seed_random_sources",
+        autospec=True,
     )
 
     arguments = PretrainArguments(
@@ -61,14 +79,20 @@ def test_prepare_pretrain_run_valid_input(tmp_path, mocker, run_config):
     assert result == PreparedPretrainRun(
         arguments=arguments,
         config=run_config,
+        runtime=ResolvedRuntime(
+            device=torch.device("cuda"),
+            seed=run_config.training.seed,
+        ),
     )
 
     assert outputs_dir.is_dir()
     mock_load_run_config.assert_called_once_with(config_file)
+    mock_resolve_device.assert_called_once_with("auto")
+    mock_seed_random_sources.assert_called_once_with(run_config.training.seed)
 
 
 def test_prepare_pretrain_run_raises_if_config_file_not_exists(
-    tmp_path, mocker, run_config
+    tmp_path: Path, mocker: MockerFixture, run_config: RunConfig
 ):
     config_file = tmp_path / "pretrain-tiny.toml"
     input_file = tmp_path / "training.txt"
@@ -82,6 +106,17 @@ def test_prepare_pretrain_run_raises_if_config_file_not_exists(
         return_value=run_config,
     )
 
+    mock_resolve_device = mocker.patch(
+        "gpt_2.workflow.resolve_device",
+        autospec=True,
+        return_value=torch.device("cuda"),
+    )
+
+    mock_seed_random_sources = mocker.patch(
+        "gpt_2.workflow.seed_random_sources",
+        autospec=True,
+    )
+
     arguments = PretrainArguments(
         config=config_file,
         input=input_file,
@@ -92,11 +127,15 @@ def test_prepare_pretrain_run_raises_if_config_file_not_exists(
         prepare_pretrain_run(arguments=arguments)
 
     mock_load_run_config.assert_not_called()
+    mock_resolve_device.assert_not_called()
+    mock_seed_random_sources.assert_not_called()
     assert not outputs_dir.exists()
 
 
 def test_prepare_pretrain_run_raises_if_input_file_not_exists(
-    tmp_path, mocker, run_config
+    tmp_path: Path,
+    mocker: MockerFixture,
+    run_config: RunConfig,
 ):
     config_file = tmp_path / "pretrain-tiny.toml"
     input_file = tmp_path / "training.txt"
@@ -110,6 +149,17 @@ def test_prepare_pretrain_run_raises_if_input_file_not_exists(
         return_value=run_config,
     )
 
+    mock_resolve_device = mocker.patch(
+        "gpt_2.workflow.resolve_device",
+        autospec=True,
+        return_value=torch.device("cuda"),
+    )
+
+    mock_seed_random_sources = mocker.patch(
+        "gpt_2.workflow.seed_random_sources",
+        autospec=True,
+    )
+
     arguments = PretrainArguments(
         config=config_file,
         input=input_file,
@@ -120,10 +170,14 @@ def test_prepare_pretrain_run_raises_if_input_file_not_exists(
         prepare_pretrain_run(arguments=arguments)
 
     mock_load_run_config.assert_not_called()
+    mock_resolve_device.assert_not_called()
+    mock_seed_random_sources.assert_not_called()
     assert not outputs_dir.exists()
 
 
-def test_prepare_pretrain_run_raises_if_output_dir_exists(tmp_path, mocker, run_config):
+def test_prepare_pretrain_run_raises_if_output_dir_exists(
+    tmp_path: Path, mocker: MockerFixture, run_config: RunConfig
+):
     config_file = tmp_path / "pretrain-tiny.toml"
     input_file = tmp_path / "training.txt"
     outputs_dir = tmp_path / "run-001"
@@ -138,6 +192,17 @@ def test_prepare_pretrain_run_raises_if_output_dir_exists(tmp_path, mocker, run_
         return_value=run_config,
     )
 
+    mock_resolve_device = mocker.patch(
+        "gpt_2.workflow.resolve_device",
+        autospec=True,
+        return_value=torch.device("cuda"),
+    )
+
+    mock_seed_random_sources = mocker.patch(
+        "gpt_2.workflow.seed_random_sources",
+        autospec=True,
+    )
+
     arguments = PretrainArguments(
         config=config_file,
         input=input_file,
@@ -148,12 +213,13 @@ def test_prepare_pretrain_run_raises_if_output_dir_exists(tmp_path, mocker, run_
         prepare_pretrain_run(arguments=arguments)
 
     assert outputs_dir.exists()
+    mock_resolve_device.assert_not_called()
+    mock_seed_random_sources.assert_not_called()
 
 
 def test_invalid_config_does_not_create_output(
-    tmp_path,
-    mocker,
-    run_config,
+    tmp_path: Path,
+    mocker: MockerFixture,
 ):
     config_file = tmp_path / "config.toml"
     input_file = tmp_path / "training.txt"
@@ -168,6 +234,17 @@ def test_invalid_config_does_not_create_output(
         side_effect=ValueError("Invalid configuration"),
     )
 
+    mock_resolve_device = mocker.patch(
+        "gpt_2.workflow.resolve_device",
+        autospec=True,
+        return_value=torch.device("cuda"),
+    )
+
+    mock_seed_random_sources = mocker.patch(
+        "gpt_2.workflow.seed_random_sources",
+        autospec=True,
+    )
+
     arguments = PretrainArguments(
         config=config_file,
         input=input_file,
@@ -178,4 +255,48 @@ def test_invalid_config_does_not_create_output(
         prepare_pretrain_run(arguments)
 
     mock_load_run_config.assert_called_once_with(config_file)
+    mock_resolve_device.assert_not_called()
+    mock_seed_random_sources.assert_not_called()
     assert not output_dir.exists()
+
+
+def test_prepare_pretrain_fails_if_device_resolution_fails(
+    tmp_path: Path, run_config: RunConfig, mocker: MockerFixture
+):
+    config_file = tmp_path / "pretrain-tiny.toml"
+    input_file = tmp_path / "training.txt"
+    outputs_dir = tmp_path / "run-001"
+
+    config_file.touch()
+    input_file.write_text("Some input text", encoding="utf-8")
+
+    mock_load_run_config = mocker.patch(
+        "gpt_2.workflow.load_run_config",
+        autospec=True,
+        return_value=run_config,
+    )
+
+    mock_resolve_device = mocker.patch(
+        "gpt_2.workflow.resolve_device",
+        autospec=True,
+        side_effect=RuntimeError("accelerator cuda is not available on your machine."),
+    )
+
+    mock_seed_random_sources = mocker.patch(
+        "gpt_2.workflow.seed_random_sources",
+        autospec=True,
+    )
+
+    arguments = PretrainArguments(
+        config=config_file,
+        input=input_file,
+        output_dir=outputs_dir,
+    )
+
+    with pytest.raises(RuntimeError, match="cuda"):
+        prepare_pretrain_run(arguments=arguments)
+
+    mock_load_run_config.assert_called_once_with(config_file)
+    mock_resolve_device.assert_called_once_with("auto")
+    mock_seed_random_sources.assert_not_called()
+    assert not outputs_dir.exists()

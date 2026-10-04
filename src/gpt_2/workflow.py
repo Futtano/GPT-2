@@ -2,12 +2,14 @@ from dataclasses import dataclass
 
 from gpt_2.cli import PretrainArguments
 from gpt_2.config import RunConfig, load_run_config
+from gpt_2.runtime import ResolvedRuntime, resolve_device, seed_random_sources
 
 
 @dataclass(frozen=True)
 class PreparedPretrainRun:
     arguments: PretrainArguments
     config: RunConfig
+    runtime: ResolvedRuntime
 
 
 def prepare_pretrain_run(
@@ -23,9 +25,16 @@ def prepare_pretrain_run(
 
     config = load_run_config(arguments.config)
 
+    if arguments.output_dir.exists():
+        raise FileExistsError(f"{arguments.output_dir} already exists.")
+
+    resolved_device = resolve_device(name=config.training.device)
+    seed_random_sources(seed=config.training.seed)
     arguments.output_dir.mkdir(parents=True, exist_ok=False)
+    runtime = ResolvedRuntime(device=resolved_device, seed=config.training.seed)
 
     return PreparedPretrainRun(
         arguments=arguments,
         config=config,
+        runtime=runtime,
     )

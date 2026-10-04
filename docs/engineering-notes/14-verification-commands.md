@@ -54,6 +54,21 @@ Ruff and ty are pinned development dependencies. Their source scope, target
 Python version, and rule policy are stored in pyproject.toml so editor,
 terminal, and CI checks agree.
 
+## Commit hooks and CI
+
+```bash
+# Install local commit hooks once per checkout
+uv run --locked pre-commit install
+
+# Run hooks against all tracked files
+uv run --locked pre-commit run --all-files
+```
+
+GitHub Actions runs lint, formatting, type checks, and warning-strict tests on
+Python 3.12 and 3.13 using the locked dependencies. See
+[pre-commit and CI](20-pre-commit-and-continuous-integration.md) for setup and
+the separate GitHub setting needed to require passing checks before merging.
+
 ## Diff hygiene
 
 ```bash

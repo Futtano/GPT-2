@@ -77,9 +77,7 @@ invalid. Translate these low-level failures at the section boundary:
 try:
     training = TrainingConfig(**training_values)
 except (TypeError, ValueError) as error:
-    raise ValueError(
-        f"Invalid [training] configuration: {error}"
-    ) from error
+    raise ValueError(f"Invalid [training] configuration: {error}") from error
 ~~~
 
 The section name tells the user where to look. The raise-from form retains the

@@ -22,7 +22,7 @@ A completed run must:
 6. load the selected model for text generation;
 7. resume training without losing optimizer or progress state.
 
-## Current stage: assemble the pre-training application boundary
+## Completed stage: assemble the pre-training application boundary
 
 Completed in this stage:
 
@@ -38,9 +38,16 @@ Completed in this stage:
 - Added bounded, deterministic seeding for Python, NumPy, and PyTorch random
   sources.
 
-Currently implementing:
+- Attached the effective device and seed as frozen ResolvedRuntime state to
+  PreparedPretrainRun.
+- Verified that missing inputs, invalid configuration, existing output paths,
+  and device-resolution failures stop before seeding or creating output.
 
-- Attach resolved runtime state to the prepared run.
+## Current task: read and tokenize the local text input
+
+Build a small, independently testable boundary for UTF-8 text loading and GPT-2
+tokenization before assembling the model and training loop. Validate empty
+input and compatibility between tokenizer IDs and the configured vocabulary.
 
 ## Next milestones
 
@@ -95,6 +102,8 @@ Currently implementing:
 - Lazy token datasets and reproducible train, validation, and test loaders.
 - Clean Ruff linting and formatting plus ty static type checking.
 - Version-controlled VS Code configuration using the project environment.
+- Local pre-commit hooks and GitHub Actions checks for both supported Python
+  versions; merge protection must be configured separately on GitHub.
 
 ## Working rules
 
@@ -113,3 +122,5 @@ Currently implementing:
 - [Verification commands](engineering-notes/14-verification-commands.md)
 - [Typed TOML configuration](engineering-notes/18-typed-toml-configuration.md)
 - [Typed negative tests and mocking](engineering-notes/19-typed-negative-tests-and-mocking.md)
+- [Pre-commit and CI](engineering-notes/20-pre-commit-and-continuous-integration.md)
+- [Resolved runtime and preparation order](engineering-notes/21-resolved-runtime-and-preparation.md)
