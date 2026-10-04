@@ -1,10 +1,12 @@
 import math
 import urllib.request
 from collections.abc import Sequence
+from pathlib import Path
 
 import pytest
 import tiktoken
 import torch
+from pytest_mock import MockerFixture
 from torch.utils.data import RandomSampler, SequentialSampler
 
 from gpt_2.config import DataConfig, ModelConfig, TrainingConfig
@@ -15,6 +17,7 @@ from gpt_2.dataset import (
     create_data_loader_v1,
     create_data_loaders,
     download_pt_dataset,
+    load_text_token_ids,
     split_token_ids,
 )
 
@@ -25,7 +28,7 @@ EXPECTED_DATASET_URL = (
 )
 
 VALID_MODEL_CONFIG = ModelConfig(
-    vocab_size=100,
+    vocab_size=50_257,
     context_length=10,
     emb_dim=24,
     n_heads=4,
@@ -495,3 +498,118 @@ def test_data_loaders_produce_expected_shape_and_dtype():
             assert targets.shape[-1] == VALID_MODEL_CONFIG.context_length
             assert inputs.dtype == torch.long
             assert targets.dtype == torch.long
+
+
+@pytest.fixture
+def expected():
+    return [1, 2, 3, 4]
+
+
+@pytest.mark.parametrize(
+    "txt",
+    ["Hello!", " \nHello! \t", "Hello <|endoftext|>"],
+)
+def test_load_text_token_ids_accepts_valid_text(
+    tmp_path: Path,
+    mocker: MockerFixture,
+    expected: list[int],
+    txt: str,
+):
+    input_file = tmp_path / "input.txt"
+    input_file.write_text(txt, encoding="utf-8")
+
+    tokenizer = mocker.Mock()
+    tokenizer.n_vocab = VALID_MODEL_CONFIG.vocab_size
+    tokenizer.encode.return_value = expected
+
+    mock_get_encoding = mocker.patch(
+        "gpt_2.dataset.tiktoken.get_encoding",
+        return_value=tokenizer,
+    )
+
+    assert expected == load_text_token_ids(
+        path=input_file,
+        model_config=VALID_MODEL_CONFIG,
+    )
+    mock_get_encoding.assert_called_once_with("gpt2")
+    tokenizer.encode.assert_called_once_with(txt, disallowed_special=())
+
+
+@pytest.mark.parametrize(
+    "txt",
+    [
+        "",
+        "\n\n\t\t   ",
+    ],
+)
+def test_load_text_token_ids_rejects_empty_or_whitespace_input(
+    tmp_path: Path,
+    txt: str,
+):
+    input_file = tmp_path / "input.txt"
+    input_file.write_text(txt, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="empty"):
+        load_text_token_ids(input_file, model_config=VALID_MODEL_CONFIG)
+
+
+def test_load_text_token_ids_rejects_missing_files(
+    tmp_path: Path,
+):
+    input_file = tmp_path / "input.txt"
+
+    with pytest.raises(FileNotFoundError, match="not exist"):
+        load_text_token_ids(input_file, model_config=VALID_MODEL_CONFIG)
+
+
+def test_load_text_token_ids_rejects_directory(
+    tmp_path: Path,
+):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir(parents=True)
+
+    with pytest.raises(FileNotFoundError, match="not a file"):
+        load_text_token_ids(input_dir, model_config=VALID_MODEL_CONFIG)
+
+
+def test_load_text_token_ids_rejects_non_utf8_text(
+    tmp_path: Path,
+):
+    input_file = tmp_path / "input.txt"
+    txt = "The quick brown fox jumps over the lazy dog."
+    input_file.write_text(txt, encoding="cp500")
+
+    with pytest.raises(UnicodeDecodeError):
+        load_text_token_ids(input_file, model_config=VALID_MODEL_CONFIG)
+
+
+def test_load_text_token_ids_rejects_vocab_mismatch(
+    tmp_path: Path,
+    mocker: MockerFixture,
+):
+    input_file = tmp_path / "input.txt"
+    txt = "The quick brown fox jumps over the lazy dog."
+    input_file.write_text(txt, encoding="utf-8")
+
+    tokenizer = mocker.Mock()
+    tokenizer.n_vocab = VALID_MODEL_CONFIG.vocab_size
+
+    mock_get_encoding = mocker.patch(
+        "gpt_2.dataset.tiktoken.get_encoding",
+        return_value=tokenizer,
+    )
+
+    invalid_config = ModelConfig(
+        vocab_size=123,
+        context_length=VALID_MODEL_CONFIG.context_length,
+        emb_dim=VALID_MODEL_CONFIG.emb_dim,
+        n_heads=VALID_MODEL_CONFIG.n_heads,
+        n_layers=VALID_MODEL_CONFIG.n_layers,
+        drop_rate=VALID_MODEL_CONFIG.drop_rate,
+        qkv_bias=VALID_MODEL_CONFIG.qkv_bias,
+    )
+
+    with pytest.raises(ValueError, match="vocab size"):
+        load_text_token_ids(input_file, model_config=invalid_config)
+    mock_get_encoding.assert_called_once_with("gpt2")
+    tokenizer.encode.assert_not_called()

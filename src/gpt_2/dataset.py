@@ -208,3 +208,29 @@ def download_pt_dataset(file_path="data/the-verdict.txt"):
 
 def get_root():
     return Path.cwd()
+
+
+def load_text_token_ids(
+    path: Path,
+    *,
+    model_config: ModelConfig,
+) -> list[int]:
+    if not path.exists():
+        raise FileNotFoundError(f"file {path} does not exist.")
+    if not path.is_file():
+        raise FileNotFoundError(f"{path} is not a file.")
+
+    txt = path.read_text(encoding="utf-8", errors="strict")
+
+    if not txt.strip():
+        raise ValueError(
+            f"{path} contains is either empty or contains only whitespaces."
+        )
+
+    tokenizer = tiktoken.get_encoding("gpt2")
+    if model_config.vocab_size != tokenizer.n_vocab:
+        raise ValueError(
+            f"{model_config.vocab_size=} must equal the tokenizer vocab size of {tokenizer.n_vocab}."
+        )
+
+    return tokenizer.encode(txt, disallowed_special=())

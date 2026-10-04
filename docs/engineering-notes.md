@@ -13,6 +13,7 @@ Current implementation status and upcoming milestones live in the
 3. [Split sequential data before creating windows](engineering-notes/03-sequential-data-splits.md)
 15. [Build language-model windows lazily](engineering-notes/15-lazy-token-datasets.md)
 16. [Build reproducible loaders from disjoint token splits](engineering-notes/16-reproducible-data-loaders.md)
+22. [Load text and enforce tokenizer contracts](engineering-notes/22-text-loading-and-tokenizer-contracts.md)
 
 ## Packaging and compatibility
 

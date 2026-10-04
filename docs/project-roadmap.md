@@ -37,23 +37,31 @@ Completed in this stage:
   availability checks and deterministic fallback priority.
 - Added bounded, deterministic seeding for Python, NumPy, and PyTorch random
   sources.
-
 - Attached the effective device and seed as frozen ResolvedRuntime state to
   PreparedPretrainRun.
 - Verified that missing inputs, invalid configuration, existing output paths,
   and device-resolution failures stop before seeding or creating output.
 
-## Current task: read and tokenize the local text input
+## Completed in the executable training workflow
 
-Build a small, independently testable boundary for UTF-8 text loading and GPT-2
-tokenization before assembling the model and training loop. Validate empty
-input and compatibility between tokenizer IDs and the configured vocabulary.
+- Added UTF-8 text loading with empty-input and file-error validation.
+- Preserved text whitespace when encoding and made special-token handling
+  explicit.
+- Required matching model and GPT-2 tokenizer vocabularies.
+- Added hermetic tokenizer mocks and regression cases for whitespace and
+  literal special-token spellings.
+
+## Current task: connect token loading to data loaders
+
+Add a workflow helper accepting PreparedPretrainRun, loading its input token
+IDs, and passing the model, training, and data configurations to the existing
+create_data_loaders factory. Return DataLoaderBundle. Test argument forwarding
+and error propagation without constructing a model or starting training.
 
 ## Next milestones
 
 ### 1. Build the executable training workflow
 
-- Read and tokenize the local text input.
 - Construct disjoint token splits and reproducible data loaders.
 - Instantiate the model and optimizer from RunConfig.
 - Connect evaluation frequency and epoch settings to the training loop.
@@ -124,3 +132,4 @@ input and compatibility between tokenizer IDs and the configured vocabulary.
 - [Typed negative tests and mocking](engineering-notes/19-typed-negative-tests-and-mocking.md)
 - [Pre-commit and CI](engineering-notes/20-pre-commit-and-continuous-integration.md)
 - [Resolved runtime and preparation order](engineering-notes/21-resolved-runtime-and-preparation.md)
+- [Text loading and tokenizer contracts](engineering-notes/22-text-loading-and-tokenizer-contracts.md)
