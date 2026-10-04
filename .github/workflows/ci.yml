@@ -23,7 +23,6 @@ jobs:
         python-version: ["3.12", "3.13"]
     env:
       MPLBACKEND: Agg
-      TIKTOKEN_CACHE_DIR: ${{ runner.temp }}/tiktoken
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,7 +53,11 @@ jobs:
       # tiktoken downloads GPT-2 assets on first use. Keep this network setup
       # separate from the tests, which can then reuse the local cache.
       - name: Prepare GPT-2 tokenizer assets
+        env:
+          TIKTOKEN_CACHE_DIR: ${{ runner.temp }}/tiktoken
         run: uv run --locked python -c 'import tiktoken; tiktoken.get_encoding("gpt2")'
 
       - name: Run tests with warnings treated as errors
+        env:
+          TIKTOKEN_CACHE_DIR: ${{ runner.temp }}/tiktoken
         run: uv run --locked pytest -q -W error

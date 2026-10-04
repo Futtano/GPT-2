@@ -59,6 +59,12 @@ step initializes the GPT-2 tokenizer cache because tiktoken downloads encoding
 assets on first use. This makes setup failures distinct from test failures; it
 does not enforce network isolation during pytest.
 
+GitHub restricts which expression contexts are available at each workflow key.
+For example, `runner.temp` is available in step-level `env`, but not job-level
+`env`. The tokenizer cache variable therefore belongs on the asset preparation
+and pytest steps. A generic YAML parser checks syntax but cannot validate these
+GitHub-specific context rules; the first hosted run verifies workflow startup.
+
 ## Require successful checks before merging
 
 Local hooks can be skipped. GitHub Actions automatically reports failures, but
@@ -78,5 +84,6 @@ workflow alone does not prohibit merging a failing pull request.
 - [Ruff hook integration](https://docs.astral.sh/ruff/integrations/)
 - [uv in GitHub Actions](https://docs.astral.sh/uv/guides/integration/github/)
 - [GitHub protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)
+- [GitHub expression context availability](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability)
 
 [Back to the engineering-notes index](../engineering-notes.md)
