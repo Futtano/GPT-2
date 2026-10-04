@@ -6,8 +6,13 @@ from pytest_mock import MockerFixture
 
 from gpt_2.cli import PretrainArguments
 from gpt_2.config import DataConfig, ModelConfig, RunConfig, TrainingConfig
+from gpt_2.dataset import DataLoaderBundle
 from gpt_2.runtime import ResolvedRuntime
-from gpt_2.workflow import PreparedPretrainRun, prepare_pretrain_run
+from gpt_2.workflow import (
+    PreparedPretrainRun,
+    create_pretrain_loaders,
+    prepare_pretrain_run,
+)
 
 
 @pytest.fixture
@@ -38,6 +43,14 @@ def run_config() -> RunConfig:
             seed=0,
             device="auto",
         ),
+    )
+
+
+@pytest.fixture
+def runtime(run_config: RunConfig) -> ResolvedRuntime:
+    return ResolvedRuntime(
+        device=torch.device("cpu"),
+        seed=run_config.training.seed,
     )
 
 
@@ -300,3 +313,141 @@ def test_prepare_pretrain_fails_if_device_resolution_fails(
     mock_resolve_device.assert_called_once_with("auto")
     mock_seed_random_sources.assert_not_called()
     assert not outputs_dir.exists()
+
+
+def test_create_pretrain_loaders(
+    tmp_path: Path,
+    mocker: MockerFixture,
+    run_config: RunConfig,
+    runtime: ResolvedRuntime,
+):
+
+    config_file = tmp_path / "pretrain-tiny.toml"
+    input_file = tmp_path / "training.txt"
+    output_dir = tmp_path / "run-001"
+
+    run = PreparedPretrainRun(
+        config=run_config,
+        runtime=runtime,
+        arguments=PretrainArguments(
+            config=config_file,
+            input=input_file,
+            output_dir=output_dir,
+        ),
+    )
+
+    token_ids = [1, 2, 3, 4]
+    bundle = mocker.Mock(spec=DataLoaderBundle)
+
+    mock_load_tokens = mocker.patch(
+        "gpt_2.workflow.load_text_token_ids",
+        autospec=True,
+        return_value=token_ids,
+    )
+    mock_create_loaders = mocker.patch(
+        "gpt_2.workflow.create_data_loaders",
+        autospec=True,
+        return_value=bundle,
+    )
+
+    result = create_pretrain_loaders(run)
+
+    mock_load_tokens.assert_called_once_with(
+        run.arguments.input,
+        model_config=run.config.model,
+    )
+    mock_create_loaders.assert_called_once_with(
+        token_ids,
+        model_config=run.config.model,
+        training_config=run.config.training,
+        data_config=run.config.data,
+    )
+    assert result is bundle
+
+
+def test_create_pretrain_loaders_token_loading_error_prevents_loader_construction(
+    tmp_path: Path,
+    mocker: MockerFixture,
+    run_config: RunConfig,
+    runtime: ResolvedRuntime,
+):
+
+    config_file = tmp_path / "pretrain-tiny.toml"
+    input_file = tmp_path / "training.txt"
+    output_dir = tmp_path / "run-001"
+
+    run = PreparedPretrainRun(
+        config=run_config,
+        runtime=runtime,
+        arguments=PretrainArguments(
+            config=config_file,
+            input=input_file,
+            output_dir=output_dir,
+        ),
+    )
+
+    mock_load_tokens = mocker.patch(
+        "gpt_2.workflow.load_text_token_ids",
+        autospec=True,
+        side_effect=ValueError("token loading failure"),
+    )
+    mock_create_loaders = mocker.patch(
+        "gpt_2.workflow.create_data_loaders",
+        autospec=True,
+    )
+
+    with pytest.raises(ValueError, match="token loading failure"):
+        create_pretrain_loaders(run)
+
+    mock_load_tokens.assert_called_once_with(
+        path=run.arguments.input, model_config=run.config.model
+    )
+    mock_create_loaders.assert_not_called()
+
+
+def test_create_pretrain_loaders_loading_error_propagates_to_caller(
+    tmp_path: Path,
+    mocker: MockerFixture,
+    run_config: RunConfig,
+    runtime: ResolvedRuntime,
+):
+
+    config_file = tmp_path / "pretrain-tiny.toml"
+    input_file = tmp_path / "training.txt"
+    output_dir = tmp_path / "run-001"
+
+    run = PreparedPretrainRun(
+        config=run_config,
+        runtime=runtime,
+        arguments=PretrainArguments(
+            config=config_file,
+            input=input_file,
+            output_dir=output_dir,
+        ),
+    )
+
+    token_ids = [1, 2, 3, 4, 5]
+
+    mock_load_tokens = mocker.patch(
+        "gpt_2.workflow.load_text_token_ids",
+        autospec=True,
+        return_value=token_ids,
+    )
+    mock_create_loaders = mocker.patch(
+        "gpt_2.workflow.create_data_loaders",
+        autospec=True,
+        side_effect=ValueError("loader failure"),
+    )
+
+    with pytest.raises(ValueError, match="loader failure"):
+        create_pretrain_loaders(run)
+
+    mock_load_tokens.assert_called_once_with(
+        path=run.arguments.input, model_config=run.config.model
+    )
+    mock_create_loaders.assert_called_once_with(
+        token_ids=token_ids,
+        model_config=run.config.model,
+        training_config=run.config.training,
+        data_config=run.config.data,
+    )

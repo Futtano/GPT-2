@@ -50,19 +50,23 @@ Completed in this stage:
 - Required matching model and GPT-2 tokenizer vocabularies.
 - Added hermetic tokenizer mocks and regression cases for whitespace and
   literal special-token spellings.
+- Connected text loading to the existing split and data-loader factory through
+  create_pretrain_loaders.
+- Verified configuration forwarding, returned bundle identity, and failure
+  propagation with mocked dependencies.
 
-## Current task: connect token loading to data loaders
+## Current task: construct the model and optimizer
 
-Add a workflow helper accepting PreparedPretrainRun, loading its input token
-IDs, and passing the model, training, and data configurations to the existing
-create_data_loaders factory. Return DataLoaderBundle. Test argument forwarding
-and error propagation without constructing a model or starting training.
+Add a typed workflow helper that constructs GPTModel from the prepared model
+configuration, moves it to the resolved device, and then creates AdamW using
+the configured learning rate. Use an explicit fixed weight_decay=0.0 for this
+initial workflow. Return the model and optimizer together; do not run training
+or repeat seeding in this factory.
 
 ## Next milestones
 
 ### 1. Build the executable training workflow
 
-- Construct disjoint token splits and reproducible data loaders.
 - Instantiate the model and optimizer from RunConfig.
 - Connect evaluation frequency and epoch settings to the training loop.
 - Evaluate the held-out test split only after model selection.
@@ -133,3 +137,4 @@ and error propagation without constructing a model or starting training.
 - [Pre-commit and CI](engineering-notes/20-pre-commit-and-continuous-integration.md)
 - [Resolved runtime and preparation order](engineering-notes/21-resolved-runtime-and-preparation.md)
 - [Text loading and tokenizer contracts](engineering-notes/22-text-loading-and-tokenizer-contracts.md)
+- [Workflow composition and mock results](engineering-notes/23-workflow-composition-and-mock-results.md)

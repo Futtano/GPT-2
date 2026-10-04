@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from gpt_2.cli import PretrainArguments
 from gpt_2.config import RunConfig, load_run_config
+from gpt_2.dataset import DataLoaderBundle, create_data_loaders, load_text_token_ids
 from gpt_2.runtime import ResolvedRuntime, resolve_device, seed_random_sources
 
 
@@ -38,3 +39,21 @@ def prepare_pretrain_run(
         config=config,
         runtime=runtime,
     )
+
+
+def create_pretrain_loaders(
+    run: PreparedPretrainRun,
+) -> DataLoaderBundle:
+    token_ids = load_text_token_ids(
+        path=run.arguments.input,
+        model_config=run.config.model,
+    )
+
+    bundle = create_data_loaders(
+        token_ids=token_ids,
+        model_config=run.config.model,
+        training_config=run.config.training,
+        data_config=run.config.data,
+    )
+
+    return bundle
