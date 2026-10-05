@@ -54,20 +54,24 @@ Completed in this stage:
   create_pretrain_loaders.
 - Verified configuration forwarding, returned bundle identity, and failure
   propagation with mocked dependencies.
+- Added PretrainComponents and constructed the configured model on its
+  resolved device before creating AdamW with explicit zero weight decay.
+- Verified optimizer parameter identity, settings, and device movement using
+  a tiny real CPU model, a method spy, and a shared prepared-run fixture.
 
-## Current task: construct the model and optimizer
+## Current task: make loader loss evaluation token-weighted
 
-Add a typed workflow helper that constructs GPTModel from the prepared model
-configuration, moves it to the resolved device, and then creates AdamW using
-the configured learning rate. Use an explicit fixed weight_decay=0.0 for this
-initial workflow. Return the model and optimizer together; do not run training
-or repeat seeding in this factory.
+Update calc_loss_loader to weight each mean batch loss by its target-token
+count, then divide by the total number of evaluated target tokens. Add typed
+parameters and a float return type, keep the optional batch limit, and reject
+empty evaluation instead of returning NaN. Cover uneven batches and truncated
+evaluation before assembling the training loop.
 
 ## Next milestones
 
 ### 1. Build the executable training workflow
 
-- Instantiate the model and optimizer from RunConfig.
+- Compute token-weighted evaluation loss, including partial batches.
 - Connect evaluation frequency and epoch settings to the training loop.
 - Evaluate the held-out test split only after model selection.
 
@@ -138,3 +142,4 @@ or repeat seeding in this factory.
 - [Resolved runtime and preparation order](engineering-notes/21-resolved-runtime-and-preparation.md)
 - [Text loading and tokenizer contracts](engineering-notes/22-text-loading-and-tokenizer-contracts.md)
 - [Workflow composition and mock results](engineering-notes/23-workflow-composition-and-mock-results.md)
+- [Model, optimizer, and device tests](engineering-notes/24-model-optimizer-and-device-tests.md)

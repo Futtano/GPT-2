@@ -15,6 +15,7 @@ Current implementation status and upcoming milestones live in the
 16. [Build reproducible loaders from disjoint token splits](engineering-notes/16-reproducible-data-loaders.md)
 22. [Load text and enforce tokenizer contracts](engineering-notes/22-text-loading-and-tokenizer-contracts.md)
 23. [Compose workflows and test mock results](engineering-notes/23-workflow-composition-and-mock-results.md)
+24. [Construct model and optimizer and test device placement](engineering-notes/24-model-optimizer-and-device-tests.md)
 
 ## Packaging and compatibility
 

@@ -7,9 +7,11 @@ from pytest_mock import MockerFixture
 from gpt_2.cli import PretrainArguments
 from gpt_2.config import DataConfig, ModelConfig, RunConfig, TrainingConfig
 from gpt_2.dataset import DataLoaderBundle
+from gpt_2.model import GPTModel
 from gpt_2.runtime import ResolvedRuntime
 from gpt_2.workflow import (
     PreparedPretrainRun,
+    create_pretrain_components,
     create_pretrain_loaders,
     prepare_pretrain_run,
 )
@@ -51,6 +53,23 @@ def runtime(run_config: RunConfig) -> ResolvedRuntime:
     return ResolvedRuntime(
         device=torch.device("cpu"),
         seed=run_config.training.seed,
+    )
+
+
+@pytest.fixture
+def prepared_run(
+    tmp_path: Path,
+    run_config: RunConfig,
+    runtime: ResolvedRuntime,
+) -> PreparedPretrainRun:
+    return PreparedPretrainRun(
+        arguments=PretrainArguments(
+            config=tmp_path / "pretrain-tiny.toml",
+            input=tmp_path / "training.txt",
+            output_dir=tmp_path / "run-001",
+        ),
+        config=run_config,
+        runtime=runtime,
     )
 
 
@@ -316,26 +335,10 @@ def test_prepare_pretrain_fails_if_device_resolution_fails(
 
 
 def test_create_pretrain_loaders(
-    tmp_path: Path,
     mocker: MockerFixture,
-    run_config: RunConfig,
-    runtime: ResolvedRuntime,
+    prepared_run: PreparedPretrainRun,
 ):
-
-    config_file = tmp_path / "pretrain-tiny.toml"
-    input_file = tmp_path / "training.txt"
-    output_dir = tmp_path / "run-001"
-
-    run = PreparedPretrainRun(
-        config=run_config,
-        runtime=runtime,
-        arguments=PretrainArguments(
-            config=config_file,
-            input=input_file,
-            output_dir=output_dir,
-        ),
-    )
-
+    run = prepared_run
     token_ids = [1, 2, 3, 4]
     bundle = mocker.Mock(spec=DataLoaderBundle)
 
@@ -366,26 +369,10 @@ def test_create_pretrain_loaders(
 
 
 def test_create_pretrain_loaders_token_loading_error_prevents_loader_construction(
-    tmp_path: Path,
     mocker: MockerFixture,
-    run_config: RunConfig,
-    runtime: ResolvedRuntime,
+    prepared_run: PreparedPretrainRun,
 ):
-
-    config_file = tmp_path / "pretrain-tiny.toml"
-    input_file = tmp_path / "training.txt"
-    output_dir = tmp_path / "run-001"
-
-    run = PreparedPretrainRun(
-        config=run_config,
-        runtime=runtime,
-        arguments=PretrainArguments(
-            config=config_file,
-            input=input_file,
-            output_dir=output_dir,
-        ),
-    )
-
+    run = prepared_run
     mock_load_tokens = mocker.patch(
         "gpt_2.workflow.load_text_token_ids",
         autospec=True,
@@ -406,26 +393,10 @@ def test_create_pretrain_loaders_token_loading_error_prevents_loader_constructio
 
 
 def test_create_pretrain_loaders_loading_error_propagates_to_caller(
-    tmp_path: Path,
     mocker: MockerFixture,
-    run_config: RunConfig,
-    runtime: ResolvedRuntime,
+    prepared_run: PreparedPretrainRun,
 ):
-
-    config_file = tmp_path / "pretrain-tiny.toml"
-    input_file = tmp_path / "training.txt"
-    output_dir = tmp_path / "run-001"
-
-    run = PreparedPretrainRun(
-        config=run_config,
-        runtime=runtime,
-        arguments=PretrainArguments(
-            config=config_file,
-            input=input_file,
-            output_dir=output_dir,
-        ),
-    )
-
+    run = prepared_run
     token_ids = [1, 2, 3, 4, 5]
 
     mock_load_tokens = mocker.patch(
@@ -451,3 +422,34 @@ def test_create_pretrain_loaders_loading_error_propagates_to_caller(
         training_config=run.config.training,
         data_config=run.config.data,
     )
+
+
+def test_create_pretrain_components_handles_valid_configs(
+    mocker: MockerFixture,
+    prepared_run: PreparedPretrainRun,
+):
+    run = prepared_run
+    move_to_device = mocker.spy(GPTModel, "to")
+
+    pretrain_components = create_pretrain_components(
+        run=run,
+    )
+
+    model, optimizer = pretrain_components.model, pretrain_components.optimizer
+
+    move_to_device.assert_called_once_with(model, run.runtime.device)
+    assert model.config == run.config.model
+    for group in optimizer.param_groups:
+        assert group["lr"] == run.config.training.learning_rate
+        assert group["weight_decay"] == 0.0
+
+    optimizer_parameters = [
+        parameter for group in optimizer.param_groups for parameter in group["params"]
+    ]
+    model_parameters = list(model.parameters())
+
+    assert len(optimizer_parameters) == len(model_parameters)
+    assert {id(p) for p in optimizer_parameters} == {id(p) for p in model_parameters}
+
+    for param in model.parameters():
+        assert param.device.type == "cpu"

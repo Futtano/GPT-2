@@ -1,8 +1,11 @@
 from dataclasses import dataclass
 
+import torch
+
 from gpt_2.cli import PretrainArguments
 from gpt_2.config import RunConfig, load_run_config
 from gpt_2.dataset import DataLoaderBundle, create_data_loaders, load_text_token_ids
+from gpt_2.model import GPTModel
 from gpt_2.runtime import ResolvedRuntime, resolve_device, seed_random_sources
 
 
@@ -11,6 +14,12 @@ class PreparedPretrainRun:
     arguments: PretrainArguments
     config: RunConfig
     runtime: ResolvedRuntime
+
+
+@dataclass(frozen=True)
+class PretrainComponents:
+    model: GPTModel
+    optimizer: torch.optim.AdamW
 
 
 def prepare_pretrain_run(
@@ -57,3 +66,23 @@ def create_pretrain_loaders(
     )
 
     return bundle
+
+
+def create_pretrain_components(
+    run: PreparedPretrainRun,
+) -> PretrainComponents:
+    model = GPTModel(
+        cfg=run.config.model,
+    )
+
+    model.to(run.runtime.device)
+    optimizer = torch.optim.AdamW(
+        params=model.parameters(),
+        lr=run.config.training.learning_rate,
+        weight_decay=0.0,
+    )
+
+    return PretrainComponents(
+        model=model,
+        optimizer=optimizer,
+    )
