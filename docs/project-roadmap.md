@@ -58,20 +58,23 @@ Completed in this stage:
   resolved device before creating AdamW with explicit zero weight decay.
 - Verified optimizer parameter identity, settings, and device movement using
   a tiny real CPU model, a method spy, and a shared prepared-run fixture.
+- Computed token-weighted loader loss, including retained partial batches.
+- Added strict evaluation-limit validation and explicit failure when no
+  target tokens are evaluated, with small synthetic regression tests.
 
-## Current task: make loader loss evaluation token-weighted
+## Current task: preserve model mode during evaluation
 
-Update calc_loss_loader to weight each mean batch loss by its target-token
-count, then divide by the total number of evaluated target tokens. Add typed
-parameters and a float return type, keep the optional batch limit, and reject
-empty evaluation instead of returning NaN. Cover uneven batches and truncated
-evaluation before assembling the training loop.
+Type evaluate_model and preserve its incoming model.training state using
+try/finally. Run both train and validation loss calculations in evaluation mode
+with gradients disabled. Restore the original mode on success or failure;
+verify configuration forwarding and returned metrics before assembling the
+training loop.
 
 ## Next milestones
 
 ### 1. Build the executable training workflow
 
-- Compute token-weighted evaluation loss, including partial batches.
+- Preserve model mode and disable gradients during evaluation.
 - Connect evaluation frequency and epoch settings to the training loop.
 - Evaluate the held-out test split only after model selection.
 
@@ -143,3 +146,4 @@ evaluation before assembling the training loop.
 - [Text loading and tokenizer contracts](engineering-notes/22-text-loading-and-tokenizer-contracts.md)
 - [Workflow composition and mock results](engineering-notes/23-workflow-composition-and-mock-results.md)
 - [Model, optimizer, and device tests](engineering-notes/24-model-optimizer-and-device-tests.md)
+- [Token-weighted loss and empty evaluation](engineering-notes/25-token-weighted-loss-and-empty-evaluation.md)

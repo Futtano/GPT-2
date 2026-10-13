@@ -2,6 +2,8 @@ import numpy as np
 import pytest
 import tiktoken
 import torch
+from pytest_mock import MockerFixture
+from torch.utils.data import DataLoader, TensorDataset
 
 from gpt_2.config import ModelConfig
 from gpt_2.dataset import create_data_loader_v1
@@ -110,9 +112,8 @@ def test_calc_loss_batch(batches, model):
 
 @pytest.fixture
 def dataloader():
-    txt = "Hello from Daniele!"
     return create_data_loader_v1(
-        txt,
+        "Hello from Daniele!",
         batch_size=2,
         max_length=4,
         stride=1,
@@ -121,13 +122,93 @@ def dataloader():
     )
 
 
-def test_calc_loss_loader(dataloader, model):
-    loss = calc_loss_loader(
-        dataloader,
-        model,
-        torch.device("cpu"),
+@pytest.fixture
+def uneven_dataloader() -> DataLoader:
+    # Four samples followed by one: eight target tokens, then two.
+    tokens = torch.zeros((5, 2), dtype=torch.long)
+    return DataLoader(
+        TensorDataset(tokens, tokens.clone()),
+        batch_size=4,
+        shuffle=False,
+        drop_last=False,
     )
-    assert loss >= 0
+
+
+@pytest.mark.parametrize("num_batches", [None, 3])
+def test_calc_loss_loader_produces_token_weighted_loss(
+    uneven_dataloader: DataLoader,
+    num_batches: int | None,
+    mocker: MockerFixture,
+):
+    batch_loss = mocker.patch(
+        "gpt_2.pretrain.calc_loss_batch",
+        side_effect=[torch.tensor(2.0), torch.tensor(10.0)],
+    )
+
+    loss = calc_loss_loader(
+        uneven_dataloader,
+        torch.nn.Identity(),
+        torch.device("cpu"),
+        num_batches=num_batches,
+    )
+
+    assert batch_loss.call_count == 2
+    assert loss == pytest.approx(3.6)
+
+
+def test_calc_loss_loader_excludes_batches(
+    uneven_dataloader: DataLoader,
+    mocker: MockerFixture,
+):
+    batch_loss = mocker.patch(
+        "gpt_2.pretrain.calc_loss_batch",
+        side_effect=[torch.tensor(2.0), torch.tensor(10.0)],
+    )
+
+    loss = calc_loss_loader(
+        uneven_dataloader,
+        torch.nn.Identity(),
+        torch.device("cpu"),
+        num_batches=1,
+    )
+
+    batch_loss.assert_called_once()
+    assert loss == pytest.approx(2.0)
+
+
+@pytest.mark.parametrize("empty_samples", [False, True])
+def test_calc_loss_loader_rejects_empty_evaluation(
+    empty_samples: bool,
+    mocker: MockerFixture,
+):
+    tokens = torch.empty((1 if empty_samples else 0, 0), dtype=torch.long)
+    loader = DataLoader(TensorDataset(tokens, tokens.clone()), batch_size=1)
+    batch_loss = mocker.patch("gpt_2.pretrain.calc_loss_batch")
+
+    with pytest.raises(ValueError, match="evaluation tokens"):
+        calc_loss_loader(loader, torch.nn.Identity(), torch.device("cpu"))
+
+    batch_loss.assert_not_called()
+
+
+@pytest.mark.parametrize("num_batches", [-1, 0, True, False, 1.5, 1.0, "1"])
+def test_calc_loss_loader_rejects_invalid_num_batches(
+    num_batches: object,
+    uneven_dataloader: DataLoader,
+    mocker: MockerFixture,
+):
+    batch_loss = mocker.patch("gpt_2.pretrain.calc_loss_batch")
+
+    with pytest.raises(ValueError, match="num_batches"):
+        calc_loss_loader(
+            uneven_dataloader,
+            torch.nn.Identity(),
+            torch.device("cpu"),
+            # Deliberately violate the annotation to verify runtime validation.
+            num_batches=num_batches,  # ty: ignore[invalid-argument-type]
+        )
+
+    batch_loss.assert_not_called()
 
 
 def test_evaluate_model(model, dataloader):

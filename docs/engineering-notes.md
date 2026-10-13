@@ -16,6 +16,7 @@ Current implementation status and upcoming milestones live in the
 22. [Load text and enforce tokenizer contracts](engineering-notes/22-text-loading-and-tokenizer-contracts.md)
 23. [Compose workflows and test mock results](engineering-notes/23-workflow-composition-and-mock-results.md)
 24. [Construct model and optimizer and test device placement](engineering-notes/24-model-optimizer-and-device-tests.md)
+25. [Compute token-weighted loss and test empty evaluation](engineering-notes/25-token-weighted-loss-and-empty-evaluation.md)
 
 ## Packaging and compatibility
 

@@ -1,7 +1,10 @@
+from itertools import islice
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from matplotlib.ticker import MaxNLocator
+from torch.utils.data import DataLoader
 
 from gpt_2.model import generate_text_simple
 
@@ -28,21 +31,35 @@ def calc_loss_batch(input_batch, target_batch, model, device):
     return loss
 
 
-def calc_loss_loader(data_loader, model, device, num_batches=None):
-    total_loss = 0
+def calc_loss_loader(
+    data_loader: DataLoader,
+    model: torch.nn.Module,
+    device: torch.device,
+    num_batches: int | None = None,
+) -> float:
+    if num_batches is not None and (
+        isinstance(num_batches, bool)
+        or not isinstance(num_batches, int)
+        or num_batches <= 0
+    ):
+        raise ValueError("num_batches must be a positive integer.")
+
+    total_loss = 0.0
+    total_tokens = 0
     if len(data_loader) == 0:
-        return float("nan")
-    elif num_batches is None:
-        num_batches = len(data_loader)
-    else:
-        num_batches = min(num_batches, len(data_loader))
-    for i, (input_batch, target_batch) in enumerate(data_loader):
-        if i < num_batches:
-            loss = loss = calc_loss_batch(input_batch, target_batch, model, device)
-            total_loss += loss.item()
-        else:
-            break
-    return total_loss / num_batches
+        raise ValueError("data_loader is empty. No evaluation tokens provided.")
+
+    for input_batch, target_batch in islice(data_loader, num_batches):
+        batch_tokens = target_batch.numel()
+        if batch_tokens == 0:
+            continue
+        loss = calc_loss_batch(input_batch, target_batch, model, device)
+        total_loss += loss.item() * batch_tokens
+        total_tokens += batch_tokens
+
+    if total_tokens == 0:
+        raise ValueError("No evaluation tokens provided.")
+    return total_loss / total_tokens
 
 
 def evaluate_model(model, train_loader, val_loader, device, eval_iter):
