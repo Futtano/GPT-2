@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 import pytest
 import tiktoken
@@ -5,10 +7,12 @@ import torch
 from pytest_mock import MockerFixture
 from torch.utils.data import DataLoader, TensorDataset
 
-from gpt_2.config import ModelConfig
+from gpt_2.config import ModelConfig, TrainingConfig
 from gpt_2.dataset import create_data_loader_v1
 from gpt_2.model import GPTModel
 from gpt_2.pretrain import (
+    EvaluationRecord,
+    TrainingResult,
     assign,
     calc_loss_batch,
     calc_loss_loader,
@@ -17,6 +21,7 @@ from gpt_2.pretrain import (
     softmax_with_temperature,
     text_to_token_ids,
     token_ids_to_text,
+    train_model,
     train_model_simple,
 )
 
@@ -28,6 +33,17 @@ TINY_GPT_CONFIG = ModelConfig(
     n_layers=1,
     drop_rate=0.0,
     qkv_bias=False,
+)
+
+TINY_TRAINING_CONFIG = TrainingConfig(
+    batch_size=4,
+    learning_rate=1e-3,
+    num_epochs=2,
+    eval_every_steps=2,
+    eval_batches=2,
+    checkpoint_every_steps=2,
+    seed=123,
+    device="cpu",
 )
 
 
@@ -395,6 +411,267 @@ def test_train_model_simple(model, optimizer, dataloader):
     for el in loss2:
         assert el >= 0
     assert len(toks) >= 0
+
+
+@pytest.fixture
+def training_dataset() -> TensorDataset:
+    # Nine four-token windows produce batches of 4, 4, and 1 samples.
+    tokens = torch.arange(9 * 5, dtype=torch.long).reshape(9, 5)
+    return TensorDataset(tokens[:, :-1], tokens[:, 1:])
+
+
+@pytest.fixture
+def train_loader(training_dataset: TensorDataset) -> DataLoader:
+    return DataLoader(
+        training_dataset,
+        batch_size=TINY_TRAINING_CONFIG.batch_size,
+        shuffle=True,
+        drop_last=False,
+        num_workers=0,
+        generator=torch.Generator().manual_seed(TINY_TRAINING_CONFIG.seed),
+    )
+
+
+@pytest.fixture
+def train_eval_loader(training_dataset: TensorDataset) -> DataLoader:
+    # Evaluate the same training samples without sharing the shuffle generator.
+    return DataLoader(
+        training_dataset,
+        batch_size=TINY_TRAINING_CONFIG.batch_size,
+        shuffle=False,
+        drop_last=False,
+        num_workers=0,
+        generator=torch.Generator().manual_seed(TINY_TRAINING_CONFIG.seed),
+    )
+
+
+@pytest.fixture
+def val_loader() -> DataLoader:
+    tokens = torch.arange(64, 64 + 5 * 5, dtype=torch.long).reshape(5, 5)
+    return DataLoader(
+        TensorDataset(tokens[:, :-1], tokens[:, 1:]),
+        batch_size=TINY_TRAINING_CONFIG.batch_size,
+        shuffle=False,
+        drop_last=False,
+        num_workers=0,
+        generator=torch.Generator().manual_seed(TINY_TRAINING_CONFIG.seed),
+    )
+
+
+def test_train_model_perform_correct_num_updates(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    train_loader: DataLoader,
+    train_eval_loader: DataLoader,
+    val_loader: DataLoader,
+    mocker: MockerFixture,
+):
+    initial_parameters = [
+        parameter.detach().clone() for parameter in model.parameters()
+    ]
+    model.eval()
+    step_spy = mocker.spy(optimizer, "step")
+    result = train_model(
+        model=model,
+        optimizer=optimizer,
+        train_loader=train_loader,
+        train_eval_loader=train_eval_loader,
+        val_loader=val_loader,
+        device=torch.device("cpu"),
+        config=TINY_TRAINING_CONFIG,
+    )
+    expected_steps = len(train_loader) * TINY_TRAINING_CONFIG.num_epochs
+    assert step_spy.call_count == expected_steps
+    assert result.global_step == expected_steps
+    assert any(
+        not torch.equal(before, after)
+        for before, after in zip(initial_parameters, model.parameters(), strict=True)
+    )
+
+
+def test_train_model_partial_batches_contribute_token_counts(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    training_dataset: TensorDataset,
+    train_loader: DataLoader,
+    train_eval_loader: DataLoader,
+    val_loader: DataLoader,
+):
+    result = train_model(
+        model=model,
+        optimizer=optimizer,
+        train_loader=train_loader,
+        train_eval_loader=train_eval_loader,
+        val_loader=val_loader,
+        device=torch.device("cpu"),
+        config=TINY_TRAINING_CONFIG,
+    )
+    targets = training_dataset.tensors[1]
+    assert result.tokens_seen == targets.numel() * TINY_TRAINING_CONFIG.num_epochs
+
+
+@pytest.mark.parametrize("eval_every_steps", [2, 4, 10])
+def test_train_model_evaluation_occurs_at_expected_steps(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    train_loader: DataLoader,
+    train_eval_loader: DataLoader,
+    val_loader: DataLoader,
+    eval_every_steps: int,
+    mocker: MockerFixture,
+):
+    config = replace(TINY_TRAINING_CONFIG, eval_every_steps=eval_every_steps)
+    mock_evaluate = mocker.patch(
+        "gpt_2.pretrain.evaluate_model",
+        autospec=True,
+        return_value=(1.0, 2.0),
+    )
+    result = train_model(
+        model=model,
+        optimizer=optimizer,
+        train_loader=train_loader,
+        train_eval_loader=train_eval_loader,
+        val_loader=val_loader,
+        device=torch.device("cpu"),
+        config=config,
+    )
+
+    evaluation_steps = [evaluation.global_step for evaluation in result.evaluations]
+    total_steps = len(train_loader) * config.num_epochs
+    evaluate_period = config.eval_every_steps
+
+    expected_steps = list(range(evaluate_period, total_steps + 1, evaluate_period))
+    if total_steps % evaluate_period != 0:
+        expected_steps.append(total_steps)
+
+    assert evaluation_steps == expected_steps
+    assert mock_evaluate.call_count == len(expected_steps)
+
+
+def test_train_model_receives_separate_training_evaluation_loaders(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    train_loader: DataLoader,
+    train_eval_loader: DataLoader,
+    val_loader: DataLoader,
+    mocker: MockerFixture,
+):
+    expected_model = model
+    expected_val_loader = val_loader
+    device = torch.device("cpu")
+
+    def fake_evaluate_model(
+        model: torch.nn.Module,
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        device: torch.device,
+        eval_iter: int,
+    ) -> tuple[float, float]:
+        assert model is expected_model
+        assert train_loader is train_eval_loader
+        assert val_loader is expected_val_loader
+        assert device == torch.device("cpu")
+        assert eval_iter == TINY_TRAINING_CONFIG.eval_batches
+        return 1.0, 2.0
+
+    mock_evaluate = mocker.patch(
+        "gpt_2.pretrain.evaluate_model",
+        autospec=True,
+        side_effect=fake_evaluate_model,
+    )
+
+    result = train_model(
+        model=model,
+        optimizer=optimizer,
+        train_loader=train_loader,
+        train_eval_loader=train_eval_loader,
+        val_loader=val_loader,
+        device=device,
+        config=TINY_TRAINING_CONFIG,
+    )
+
+    assert result.evaluations
+    assert mock_evaluate.call_count == len(result.evaluations)
+
+
+def test_train_model_returns_progress_and_evaluation_records(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    train_loader: DataLoader,
+    train_eval_loader: DataLoader,
+    val_loader: DataLoader,
+    mocker: MockerFixture,
+):
+    config = replace(TINY_TRAINING_CONFIG, eval_every_steps=4)
+    mocker.patch(
+        "gpt_2.pretrain.evaluate_model",
+        autospec=True,
+        side_effect=[(1.25, 2.5), (0.75, 1.5)],
+    )
+
+    result = train_model(
+        model=model,
+        optimizer=optimizer,
+        train_loader=train_loader,
+        train_eval_loader=train_eval_loader,
+        val_loader=val_loader,
+        device=torch.device("cpu"),
+        config=config,
+    )
+
+    # Epoch one consumes 36 tokens; epoch two's first batch adds 16.
+    assert result == TrainingResult(
+        completed_epochs=2,
+        global_step=6,
+        tokens_seen=72,
+        evaluations=(
+            EvaluationRecord(
+                epoch=2,
+                global_step=4,
+                tokens_seen=52,
+                train_loss=1.25,
+                validation_loss=2.5,
+            ),
+            EvaluationRecord(
+                epoch=2,
+                global_step=6,
+                tokens_seen=72,
+                train_loss=0.75,
+                validation_loss=1.5,
+            ),
+        ),
+    )
+
+
+def test_train_model_rejects_empty_training_before_updates(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    train_eval_loader: DataLoader,
+    val_loader: DataLoader,
+    mocker: MockerFixture,
+):
+    empty_tokens = torch.empty((0, 4), dtype=torch.long)
+    empty_loader = DataLoader(TensorDataset(empty_tokens, empty_tokens.clone()))
+    step_spy = mocker.spy(optimizer, "step")
+    zero_grad_spy = mocker.spy(optimizer, "zero_grad")
+    batch_loss = mocker.patch("gpt_2.pretrain.calc_loss_batch", autospec=True)
+    evaluation = mocker.patch("gpt_2.pretrain.evaluate_model", autospec=True)
+
+    with pytest.raises(ValueError, match="zero batches"):
+        train_model(
+            model=model,
+            optimizer=optimizer,
+            train_loader=empty_loader,
+            train_eval_loader=train_eval_loader,
+            val_loader=val_loader,
+            device=torch.device("cpu"),
+            config=TINY_TRAINING_CONFIG,
+        )
+
+    zero_grad_spy.assert_not_called()
+    batch_loss.assert_not_called()
+    step_spy.assert_not_called()
+    evaluation.assert_not_called()
 
 
 @pytest.mark.parametrize(

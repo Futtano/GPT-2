@@ -65,20 +65,25 @@ Completed in this stage:
   while computing both losses in evaluation mode with gradients disabled.
 - Verified distinct loader forwarding, loss ordering, and restoration for
   both starting modes and both possible loss-failure positions.
+- Added a typed training loop with completed-update and target-token counters,
+  scheduled evaluation, and a final evaluation without duplicate records.
+- Verified real parameter updates, partial-batch token counts, evaluation
+  records, and rejection of empty training before optimization.
 
-## Current task: connect training settings to a typed training loop
+## Current task: provide an independent training-evaluation loader
 
-Build the pre-training loop around the prepared model, optimizer, and loaders.
-Define explicit step and token counters and structured evaluation records,
-connect num_epochs, eval_every_steps, and eval_batches, and use the verified
-evaluation helper. Keep test data out of periodic evaluation and leave artifact
-writes and checkpoint persistence to the subsequent milestones.
+Extend DataLoaderBundle and create_data_loaders with a nonshuffled train_eval
+loader over the training dataset. Give each evaluation loader an independent
+explicit generator so iterating evaluation changes neither the training
+shuffle generator nor the global PyTorch RNG. Verify sample order, retained
+partial batches, and RNG isolation before assembling workflow execution.
 
 ## Next milestones
 
 ### 1. Build the executable training workflow
 
-- Connect evaluation frequency and epoch settings to the training loop.
+- Add the training-evaluation loader and connect the assembled workflow to
+  train_model.
 - Evaluate the held-out test split only after model selection.
 
 ### 2. Define and write run artifacts
@@ -151,3 +156,4 @@ writes and checkpoint persistence to the subsequent milestones.
 - [Model, optimizer, and device tests](engineering-notes/24-model-optimizer-and-device-tests.md)
 - [Token-weighted loss and empty evaluation](engineering-notes/25-token-weighted-loss-and-empty-evaluation.md)
 - [Mode-preserving evaluation](engineering-notes/26-mode-preserving-evaluation.md)
+- [Typed training progress and scheduling](engineering-notes/27-typed-training-progress-and-scheduling.md)

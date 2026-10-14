@@ -18,6 +18,7 @@ Current implementation status and upcoming milestones live in the
 24. [Construct model and optimizer and test device placement](engineering-notes/24-model-optimizer-and-device-tests.md)
 25. [Compute token-weighted loss and test empty evaluation](engineering-notes/25-token-weighted-loss-and-empty-evaluation.md)
 26. [Preserve model mode and inspect evaluation state](engineering-notes/26-mode-preserving-evaluation.md)
+27. [Track typed training progress and evaluation schedules](engineering-notes/27-typed-training-progress-and-scheduling.md)
 
 ## Packaging and compatibility
 

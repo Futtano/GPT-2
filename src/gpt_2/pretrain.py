@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from itertools import islice
 
 import matplotlib.pyplot as plt
@@ -6,7 +7,25 @@ import torch
 from matplotlib.ticker import MaxNLocator
 from torch.utils.data import DataLoader
 
+from gpt_2.config import TrainingConfig
 from gpt_2.model import generate_text_simple
+
+
+@dataclass(frozen=True)
+class EvaluationRecord:
+    epoch: int
+    global_step: int
+    tokens_seen: int
+    train_loss: float
+    validation_loss: float
+
+
+@dataclass(frozen=True)
+class TrainingResult:
+    completed_epochs: int
+    global_step: int
+    tokens_seen: int
+    evaluations: tuple[EvaluationRecord, ...]
 
 
 def text_to_token_ids(text, tokenizer):
@@ -20,7 +39,12 @@ def token_ids_to_text(token_ids, tokenizer):
     return tokenizer.decode(flat.tolist())
 
 
-def calc_loss_batch(input_batch, target_batch, model, device):
+def calc_loss_batch(
+    input_batch: torch.Tensor,
+    target_batch: torch.Tensor,
+    model: torch.nn.Module,
+    device: torch.device,
+) -> torch.Tensor:
     input_batch = input_batch.to(device)
     target_batch = target_batch.to(device)
     logits = model(input_batch)
@@ -140,6 +164,80 @@ def train_model_simple(
         generate_and_print_sample(model, tokenizer, device, start_context)
 
     return train_losses, val_losses, track_tokens_seen
+
+
+def train_model(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    train_loader: DataLoader,
+    train_eval_loader: DataLoader,
+    val_loader: DataLoader,
+    device: torch.device,
+    config: TrainingConfig,
+) -> TrainingResult:
+    global_step = tokens_seen = 0
+    evaluations = []
+
+    if len(train_loader) == 0:
+        raise ValueError("train_loader has zero batches.")
+
+    for epoch in range(config.num_epochs):
+        model.train()
+        for input_batch, target_batch in train_loader:
+            optimizer.zero_grad()
+            loss = calc_loss_batch(
+                input_batch=input_batch,
+                target_batch=target_batch,
+                model=model,
+                device=device,
+            )
+            loss.backward()
+            optimizer.step()
+            global_step += 1
+            tokens_seen += target_batch.numel()
+            if global_step % config.eval_every_steps == 0:
+                train_loss, validation_loss = evaluate_model(
+                    model=model,
+                    train_loader=train_eval_loader,
+                    val_loader=val_loader,
+                    device=device,
+                    eval_iter=config.eval_batches,
+                )
+                evaluations.append(
+                    EvaluationRecord(
+                        epoch=epoch + 1,
+                        global_step=global_step,
+                        tokens_seen=tokens_seen,
+                        train_loss=train_loss,
+                        validation_loss=validation_loss,
+                    )
+                )
+        # Evaluate one more time to get metrics of the final model
+        # only if the final eval wasn't done at the last epoch
+    if global_step % config.eval_every_steps != 0:
+        train_loss, validation_loss = evaluate_model(
+            model=model,
+            train_loader=train_eval_loader,
+            val_loader=val_loader,
+            device=device,
+            eval_iter=config.eval_batches,
+        )
+        evaluations.append(
+            EvaluationRecord(
+                epoch=config.num_epochs,
+                global_step=global_step,
+                tokens_seen=tokens_seen,
+                train_loss=train_loss,
+                validation_loss=validation_loss,
+            )
+        )
+
+    return TrainingResult(
+        completed_epochs=config.num_epochs,
+        global_step=global_step,
+        tokens_seen=tokens_seen,
+        evaluations=tuple(evaluations),
+    )
 
 
 def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses):
