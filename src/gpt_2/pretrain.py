@@ -62,14 +62,25 @@ def calc_loss_loader(
     return total_loss / total_tokens
 
 
-def evaluate_model(model, train_loader, val_loader, device, eval_iter):
+def evaluate_model(
+    model: torch.nn.Module,
+    train_loader: DataLoader,
+    val_loader: DataLoader,
+    device: torch.device,
+    eval_iter: int,
+) -> tuple[float, float]:
+    was_training = model.training
     model.eval()
-    with torch.no_grad():
-        train_loss = calc_loss_loader(
-            train_loader, model, device, num_batches=eval_iter
-        )
-        val_loss = calc_loss_loader(val_loader, model, device, num_batches=eval_iter)
-    model.train()
+    try:
+        with torch.no_grad():
+            train_loss = calc_loss_loader(
+                train_loader, model, device, num_batches=eval_iter
+            )
+            val_loss = calc_loss_loader(
+                val_loader, model, device, num_batches=eval_iter
+            )
+    finally:
+        model.train(was_training)
 
     return train_loss, val_loss
 

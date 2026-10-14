@@ -211,7 +211,7 @@ def test_calc_loss_loader_rejects_invalid_num_batches(
     batch_loss.assert_not_called()
 
 
-def test_evaluate_model(model, dataloader):
+def test_evaluate_model(model: torch.nn.Module, dataloader: DataLoader):
     loss1, loss2 = evaluate_model(
         model,
         train_loader=dataloader,
@@ -221,6 +221,152 @@ def test_evaluate_model(model, dataloader):
     )
 
     assert loss1 >= 0 and loss2 >= 0
+
+
+@pytest.mark.parametrize("train", [True, False])
+def test_evaluate_model_restores_mode(
+    model: torch.nn.Module,
+    dataloader: DataLoader,
+    train: bool,
+    mocker: MockerFixture,
+):
+    mocker.patch("gpt_2.pretrain.calc_loss_loader", return_value=1.0)
+    model.train(train)
+    _, _ = evaluate_model(
+        model,
+        train_loader=dataloader,
+        val_loader=dataloader,
+        device=torch.device("cpu"),
+        eval_iter=1,
+    )
+
+    assert model.training == train
+
+
+@pytest.mark.parametrize("fail_on_validation", [False, True])
+@pytest.mark.parametrize("train", [False, True])
+def test_evaluate_model_restores_mode_after_error(
+    model: torch.nn.Module,
+    dataloader: DataLoader,
+    fail_on_validation: bool,
+    train: bool,
+    mocker: MockerFixture,
+):
+    error = ValueError("evaluation failed")
+    side_effect = [2.0, error] if fail_on_validation else error
+    mocker.patch("gpt_2.pretrain.calc_loss_loader", side_effect=side_effect)
+    with pytest.raises(ValueError):
+        model.train(train)
+        _, _ = evaluate_model(
+            model,
+            train_loader=dataloader,
+            val_loader=dataloader,
+            device=torch.device("cpu"),
+            eval_iter=1,
+        )
+
+    assert model.training == train
+
+
+def test_evaluate_model_loss_call_isin_eval_mode(
+    model: torch.nn.Module,
+    dataloader: DataLoader,
+    mocker: MockerFixture,
+):
+
+    def fake_calc_loss_loader(
+        data_loader: DataLoader,
+        model: torch.nn.Module,
+        device: torch.device,
+        num_batches: int | None = None,
+    ):
+        assert model.training is False
+        assert torch.is_grad_enabled() is False
+        return 2.0
+
+    mocker.patch(
+        "gpt_2.pretrain.calc_loss_loader",
+        autospec=True,
+        side_effect=fake_calc_loss_loader,
+    )
+    evaluate_model(
+        model,
+        train_loader=dataloader,
+        val_loader=dataloader,
+        device=torch.device("cpu"),
+        eval_iter=1,
+    )
+
+
+@pytest.mark.parametrize("correct_device", [torch.device("cpu"), torch.device("cuda")])
+@pytest.mark.parametrize("correct_num_batches", [10, 11, 12])
+def test_evaluate_model_loss_call_receive_correct_device_and_batch_limit(
+    model: torch.nn.Module,
+    mocker: MockerFixture,
+    correct_device: torch.device,
+    correct_num_batches: int,
+):
+    train_loader = mocker.Mock(spec=DataLoader)
+    val_loader = mocker.Mock(spec=DataLoader)
+
+    def fake_calc_loss_loader(
+        data_loader: DataLoader,
+        model: torch.nn.Module,
+        device: torch.device,
+        num_batches: int | None = None,
+    ) -> float:
+        assert device == correct_device
+        assert num_batches == correct_num_batches
+        return 1.0
+
+    mock_loss = mocker.patch(
+        "gpt_2.pretrain.calc_loss_loader",
+        autospec=True,
+        side_effect=fake_calc_loss_loader,
+    )
+    evaluate_model(
+        model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        device=correct_device,
+        eval_iter=correct_num_batches,
+    )
+
+    mock_loss.assert_has_calls(
+        [
+            mocker.call(
+                train_loader, model, correct_device, num_batches=correct_num_batches
+            ),
+            mocker.call(
+                val_loader, model, correct_device, num_batches=correct_num_batches
+            ),
+        ],
+        any_order=False,
+    )
+    assert mock_loss.call_count == 2
+
+
+def test_evaluate_model_loss_returns_correct_losses(
+    model: torch.nn.Module,
+    dataloader: DataLoader,
+    mocker: MockerFixture,
+):
+
+    mocker.patch(
+        "gpt_2.pretrain.calc_loss_loader",
+        autospec=True,
+        side_effect=[2.0, 3.0],
+    )
+    train_loss, val_loss = evaluate_model(
+        model,
+        train_loader=dataloader,
+        val_loader=dataloader,
+        device=torch.device("cpu"),
+        eval_iter=1,
+    )
+
+    assert train_loss == 2.0
+    assert val_loss == 3.0
 
 
 @pytest.fixture

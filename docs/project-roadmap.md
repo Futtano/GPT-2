@@ -61,20 +61,23 @@ Completed in this stage:
 - Computed token-weighted loader loss, including retained partial batches.
 - Added strict evaluation-limit validation and explicit failure when no
   target tokens are evaluated, with small synthetic regression tests.
+- Typed evaluate_model and restored its original mode after success or failure,
+  while computing both losses in evaluation mode with gradients disabled.
+- Verified distinct loader forwarding, loss ordering, and restoration for
+  both starting modes and both possible loss-failure positions.
 
-## Current task: preserve model mode during evaluation
+## Current task: connect training settings to a typed training loop
 
-Type evaluate_model and preserve its incoming model.training state using
-try/finally. Run both train and validation loss calculations in evaluation mode
-with gradients disabled. Restore the original mode on success or failure;
-verify configuration forwarding and returned metrics before assembling the
-training loop.
+Build the pre-training loop around the prepared model, optimizer, and loaders.
+Define explicit step and token counters and structured evaluation records,
+connect num_epochs, eval_every_steps, and eval_batches, and use the verified
+evaluation helper. Keep test data out of periodic evaluation and leave artifact
+writes and checkpoint persistence to the subsequent milestones.
 
 ## Next milestones
 
 ### 1. Build the executable training workflow
 
-- Preserve model mode and disable gradients during evaluation.
 - Connect evaluation frequency and epoch settings to the training loop.
 - Evaluate the held-out test split only after model selection.
 
@@ -147,3 +150,4 @@ training loop.
 - [Workflow composition and mock results](engineering-notes/23-workflow-composition-and-mock-results.md)
 - [Model, optimizer, and device tests](engineering-notes/24-model-optimizer-and-device-tests.md)
 - [Token-weighted loss and empty evaluation](engineering-notes/25-token-weighted-loss-and-empty-evaluation.md)
+- [Mode-preserving evaluation](engineering-notes/26-mode-preserving-evaluation.md)
