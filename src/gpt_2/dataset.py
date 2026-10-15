@@ -94,6 +94,7 @@ class DataLoaderBundle:
     train: DataLoader
     validation: DataLoader
     test: DataLoader
+    train_eval: DataLoader
 
 
 def create_data_loaders(
@@ -139,14 +140,28 @@ def create_data_loaders(
         stride=data_config.stride,
     )
 
-    generator = torch.Generator()
-    generator.manual_seed(training_config.seed)
+    train_generator = torch.Generator()
+    train_generator.manual_seed(training_config.seed)
+    train_eval_generator = torch.Generator()
+    train_eval_generator.manual_seed(training_config.seed)
+    validation_generator = torch.Generator()
+    validation_generator.manual_seed(training_config.seed)
+    test_generator = torch.Generator()
+    test_generator.manual_seed(training_config.seed)
 
     train_dataloader = DataLoader(
         dataset=train_dataset,
         batch_size=training_config.batch_size,
         shuffle=True,
-        generator=generator,
+        generator=train_generator,
+        num_workers=data_config.num_workers,
+        drop_last=False,
+    )
+    train_eval_dataloader = DataLoader(
+        dataset=train_dataset,
+        batch_size=training_config.batch_size,
+        shuffle=False,
+        generator=train_eval_generator,
         num_workers=data_config.num_workers,
         drop_last=False,
     )
@@ -154,6 +169,7 @@ def create_data_loaders(
         dataset=validation_dataset,
         batch_size=training_config.batch_size,
         shuffle=False,
+        generator=validation_generator,
         num_workers=data_config.num_workers,
         drop_last=False,
     )
@@ -161,12 +177,14 @@ def create_data_loaders(
         dataset=test_dataset,
         batch_size=training_config.batch_size,
         shuffle=False,
+        generator=test_generator,
         num_workers=data_config.num_workers,
         drop_last=False,
     )
 
     return DataLoaderBundle(
         train=train_dataloader,
+        train_eval=train_eval_dataloader,
         validation=validation_dataloader,
         test=test_dataloader,
     )

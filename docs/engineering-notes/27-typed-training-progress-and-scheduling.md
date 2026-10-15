@@ -110,8 +110,10 @@ object and use distinct data for validation. Four-token synthetic windows also
 avoid the legacy text-loader default of 256 tokens, which exceeds the tiny
 model's 32-token context.
 
-The application factory still needs to provide the new training-evaluation
-loader. That is the next task, including explicit evaluation generators:
+At this checkpoint the application factory still needed to provide the new
+training-evaluation loader. This is now covered by
+[evaluation-loader RNG isolation](28-evaluation-loader-rng-isolation.md),
+including explicit evaluation generators:
 DataLoader can draw an iterator base seed even when shuffling is disabled, so
 evaluation should not consume the global RNG used by training dropout.
 

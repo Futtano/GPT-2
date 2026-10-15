@@ -134,6 +134,98 @@ def test_gpt_dataset(gpt_dataset_args, max_length, stride):
     assert (targets[:-1] == inputs[1:]).all()
 
 
+@pytest.mark.parametrize("token_ids", [range(100), list(range(200)), tuple(range(300))])
+def test_create_dataloaders_uses_same_datasets_for_train_and_train_eval(
+    token_ids: Sequence[int],
+):
+    bundle = create_data_loaders(
+        token_ids=token_ids,
+        model_config=VALID_MODEL_CONFIG,
+        training_config=VALID_TRAINING_CONFIG,
+        data_config=VALID_DATASET_CONFIG,
+    )
+    assert bundle.train.dataset is bundle.train_eval.dataset
+
+
+@pytest.mark.parametrize("token_ids", [range(100), list(range(200)), tuple(range(300))])
+def test_create_dataloaders_train_eval_uses_sequential_sampler(
+    token_ids: Sequence[int],
+):
+    bundle = create_data_loaders(
+        token_ids=token_ids,
+        model_config=VALID_MODEL_CONFIG,
+        training_config=VALID_TRAINING_CONFIG,
+        data_config=VALID_DATASET_CONFIG,
+    )
+    assert isinstance(bundle.train_eval.sampler, SequentialSampler)
+    starts = torch.cat([inputs[:, 0] for inputs, _ in bundle.train_eval])
+
+    dataset = bundle.train_eval.dataset
+    assert isinstance(dataset, GPTTokenDataset)
+
+    expected = (
+        torch.arange(
+            len(dataset),
+            dtype=torch.long,
+        )
+        * VALID_DATASET_CONFIG.stride
+    )
+
+    assert torch.equal(starts, expected)
+
+
+@pytest.mark.parametrize("token_ids", [range(100), list(range(200)), tuple(range(300))])
+@pytest.mark.parametrize("loader_name", ["train_eval", "validation", "test"])
+def test_create_dataloaders_eval_loaders_keep_train_generator_unchanged(
+    token_ids: Sequence[int],
+    loader_name: str,
+):
+    bundle = create_data_loaders(
+        token_ids=token_ids,
+        model_config=VALID_MODEL_CONFIG,
+        training_config=VALID_TRAINING_CONFIG,
+        data_config=VALID_DATASET_CONFIG,
+    )
+    assert VALID_DATASET_CONFIG.num_workers == 0
+    train_generator = bundle.train.generator
+    evaluation_loader = getattr(bundle, loader_name)
+    evaluation_generator = evaluation_loader.generator
+    assert isinstance(train_generator, torch.Generator)
+    assert isinstance(evaluation_generator, torch.Generator)
+    assert evaluation_generator is not train_generator
+
+    train_state_before = train_generator.get_state().clone()
+    evaluation_state_before = evaluation_generator.get_state().clone()
+
+    # Restore global state even if a regression makes this assertion fail.
+    with torch.random.fork_rng(devices=[]):
+        global_state_before = torch.random.get_rng_state().clone()
+        batches = list(evaluation_loader)
+
+        assert batches
+        assert torch.equal(train_generator.get_state(), train_state_before)
+        assert torch.equal(torch.random.get_rng_state(), global_state_before)
+
+    # Iterator creation consumes the evaluation loader's own base-seed RNG.
+    assert not torch.equal(evaluation_generator.get_state(), evaluation_state_before)
+
+
+def test_create_dataloaders_use_distinct_generators():
+    bundle = create_data_loaders(
+        token_ids=list(range(100)),
+        model_config=VALID_MODEL_CONFIG,
+        training_config=VALID_TRAINING_CONFIG,
+        data_config=VALID_DATASET_CONFIG,
+    )
+    generators = [
+        loader.generator
+        for loader in (bundle.train, bundle.train_eval, bundle.validation, bundle.test)
+    ]
+
+    assert all(isinstance(generator, torch.Generator) for generator in generators)
+    assert len({id(generator) for generator in generators}) == 4
+
+
 @pytest.mark.parametrize(
     "batch_size, max_length, stride",
     [
@@ -385,7 +477,7 @@ def test_data_loaders_use_configured_batch_size_and_workers():
         data_config=VALID_DATASET_CONFIG,
     )
 
-    for loader in (loaders.train, loaders.validation, loaders.test):
+    for loader in (loaders.train, loaders.train_eval, loaders.validation, loaders.test):
         assert loader.batch_size == VALID_TRAINING_CONFIG.batch_size
         assert loader.num_workers == VALID_DATASET_CONFIG.num_workers
 
@@ -413,7 +505,7 @@ def test_data_loaders_retain_partial_final_batches():
         data_config=VALID_DATASET_CONFIG,
     )
 
-    for loader in (loaders.train, loaders.validation, loaders.test):
+    for loader in (loaders.train, loaders.train_eval, loaders.validation, loaders.test):
         batches = list(loader)
         loaded_samples = sum(inputs.shape[0] for inputs, _ in batches)
         dataset = loader.dataset
@@ -492,7 +584,7 @@ def test_data_loaders_produce_expected_shape_and_dtype():
         data_config=VALID_DATASET_CONFIG,
     )
 
-    for loader in (loaders.train, loaders.validation, loaders.test):
+    for loader in (loaders.train, loaders.train_eval, loaders.validation, loaders.test):
         for inputs, targets in loader:
             assert inputs.shape[-1] == VALID_MODEL_CONFIG.context_length
             assert targets.shape[-1] == VALID_MODEL_CONFIG.context_length

@@ -69,21 +69,26 @@ Completed in this stage:
   scheduled evaluation, and a final evaluation without duplicate records.
 - Verified real parameter updates, partial-batch token counts, evaluation
   records, and rejection of empty training before optimization.
+- Added train_eval over the same training dataset, using sequential sampling
+  and its own seeded generator.
+- Gave each evaluation loader a separate explicit generator and verified that
+  evaluation preserves the training generator and global PyTorch RNG state.
+- Extended configured-settings, partial-batch, shape, and dtype checks to all
+  four loaders.
 
-## Current task: provide an independent training-evaluation loader
+## Current task: assemble the in-memory pre-training workflow
 
-Extend DataLoaderBundle and create_data_loaders with a nonshuffled train_eval
-loader over the training dataset. Give each evaluation loader an independent
-explicit generator so iterating evaluation changes neither the training
-shuffle generator nor the global PyTorch RNG. Verify sample order, retained
-partial batches, and RNG isolation before assembling workflow execution.
+Connect preparation, loader construction, model/optimizer construction, and
+train_model in one workflow function. Return TrainingResult, forwarding the
+resolved device, training configuration, and the separate training-evaluation
+loader. Test assembly and failures without evaluating held-out test data;
+artifact writing and checkpoint/model-selection support remain later milestones.
 
 ## Next milestones
 
 ### 1. Build the executable training workflow
 
-- Add the training-evaluation loader and connect the assembled workflow to
-  train_model.
+- Connect the assembled workflow to train_model.
 - Evaluate the held-out test split only after model selection.
 
 ### 2. Define and write run artifacts
@@ -157,3 +162,4 @@ partial batches, and RNG isolation before assembling workflow execution.
 - [Token-weighted loss and empty evaluation](engineering-notes/25-token-weighted-loss-and-empty-evaluation.md)
 - [Mode-preserving evaluation](engineering-notes/26-mode-preserving-evaluation.md)
 - [Typed training progress and scheduling](engineering-notes/27-typed-training-progress-and-scheduling.md)
+- [Evaluation-loader RNG isolation](engineering-notes/28-evaluation-loader-rng-isolation.md)
