@@ -79,21 +79,23 @@ Completed in this stage:
   through run_pretraining, returning the training result in memory.
 - Verified stage order, exact argument forwarding, returned result identity,
   and failure propagation at each stage using autospecced mocks.
+- Ran the real in-memory workflow through a tiny CPU integration test, including
+  TOML loading, GPT-2 tokenization, optimization, and finite evaluation metrics.
+- Configured pytest importlib mode so matching unit and integration test
+  filenames are collected together without module-name collisions.
 
-## Current task: exercise a real tiny CPU workflow
+## Current task: persist run configuration and runtime metadata
 
-Add an integration test running run_pretraining through real TOML loading,
-UTF-8 input loading, GPT-2 tokenization, loader construction, model creation,
-optimization, and evaluation with a tiny CPU configuration. Verify meaningful
-progress and finite recorded losses. This checkpoint returns in-memory results;
-artifact writes, model selection, and checkpoint persistence remain subsequent
-milestones.
+Define the first run artifact: a JSON record of validated configuration and
+effective runtime settings. Preserve requested values such as device="auto"
+alongside the resolved device string. Make serialization and writing testable
+before connecting them to workflow execution. Dataset identity, metric files,
+model selection, and checkpoint persistence follow afterward.
 
 ## Next milestones
 
 ### 1. Build the executable training workflow
 
-- Verify the assembled workflow with a real tiny CPU integration test.
 - Evaluate the held-out test split only after model selection.
 
 ### 2. Define and write run artifacts
@@ -169,3 +171,4 @@ milestones.
 - [Typed training progress and scheduling](engineering-notes/27-typed-training-progress-and-scheduling.md)
 - [Evaluation-loader RNG isolation](engineering-notes/28-evaluation-loader-rng-isolation.md)
 - [Assembled workflow and cross-function mocks](engineering-notes/29-assembled-workflow-and-cross-function-mocks.md)
+- [Real workflow integration and test imports](engineering-notes/30-real-workflow-integration-and-test-imports.md)

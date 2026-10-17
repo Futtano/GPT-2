@@ -36,6 +36,7 @@ Current implementation status and upcoming milestones live in the
 10. [Keep unit-test models tiny](engineering-notes/10-fast-ml-tests.md)
 11. [Write assertions that can fail meaningfully](engineering-notes/11-effective-assertions.md)
 19. [Test typed boundaries without hiding errors](engineering-notes/19-typed-negative-tests-and-mocking.md)
+30. [Verify real workflow integration and test import modes](engineering-notes/30-real-workflow-integration-and-test-imports.md)
 
 ## Configuration and project structure
 

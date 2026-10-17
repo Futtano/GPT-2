@@ -14,6 +14,8 @@ tests/
 │       ├── test_pretrain.py
 │       └── test_sattn.py
 ├── integration/
+│   └── gpt_2/
+│       └── test_workflow.py
 └── e2e/
 ```
 
@@ -24,7 +26,12 @@ tests/
 - `tests/conftest.py` contains fixtures shared across test modules.
 
 Test directories do not need `__init__.py` unless they deliberately form
-import packages. Avoid importing helpers from one test module into another;
+import packages. The project uses pytest's `--import-mode=importlib`, configured
+in `pyproject.toml`, so unit and integration directories can both contain
+`test_workflow.py` without a module-name collision. See
+[real integration and import modes](30-real-workflow-integration-and-test-imports.md).
+
+Avoid importing helpers from one test module into another;
 put reusable fixtures in `conftest.py` and ordinary helper code in a clearly
 named support module.
 
