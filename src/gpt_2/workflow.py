@@ -6,6 +6,7 @@ from gpt_2.cli import PretrainArguments
 from gpt_2.config import RunConfig, load_run_config
 from gpt_2.dataset import DataLoaderBundle, create_data_loaders, load_text_token_ids
 from gpt_2.model import GPTModel
+from gpt_2.pretrain import TrainingResult, train_model
 from gpt_2.runtime import ResolvedRuntime, resolve_device, seed_random_sources
 
 
@@ -86,3 +87,22 @@ def create_pretrain_components(
         model=model,
         optimizer=optimizer,
     )
+
+
+def run_pretraining(
+    arguments: PretrainArguments,
+) -> TrainingResult:
+    run = prepare_pretrain_run(arguments)
+    loaders = create_pretrain_loaders(run)
+    components = create_pretrain_components(run)
+    result = train_model(
+        model=components.model,
+        optimizer=components.optimizer,
+        train_loader=loaders.train,
+        train_eval_loader=loaders.train_eval,
+        val_loader=loaders.validation,
+        device=run.runtime.device,
+        config=run.config.training,
+    )
+
+    return result

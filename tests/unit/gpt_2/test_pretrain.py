@@ -7,9 +7,8 @@ import torch
 from pytest_mock import MockerFixture
 from torch.utils.data import DataLoader, TensorDataset
 
-from gpt_2.config import ModelConfig, TrainingConfig
+from gpt_2.config import TrainingConfig
 from gpt_2.dataset import create_data_loader_v1
-from gpt_2.model import GPTModel
 from gpt_2.pretrain import (
     EvaluationRecord,
     TrainingResult,
@@ -23,16 +22,6 @@ from gpt_2.pretrain import (
     token_ids_to_text,
     train_model,
     train_model_simple,
-)
-
-TINY_GPT_CONFIG = ModelConfig(
-    vocab_size=50257,
-    context_length=32,
-    emb_dim=16,
-    n_heads=4,
-    n_layers=1,
-    drop_rate=0.0,
-    qkv_bias=False,
 )
 
 TINY_TRAINING_CONFIG = TrainingConfig(
@@ -113,11 +102,6 @@ def batches(text):
     target_batch = torch.stack(target_batch, dim=0)
 
     return input_batch, target_batch
-
-
-@pytest.fixture
-def model():
-    return GPTModel(TINY_GPT_CONFIG)
 
 
 def test_calc_loss_batch(batches, model):

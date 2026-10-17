@@ -3,17 +3,21 @@ from pathlib import Path
 import pytest
 import torch
 from pytest_mock import MockerFixture
+from torch.utils.data import DataLoader
 
 from gpt_2.cli import PretrainArguments
 from gpt_2.config import DataConfig, ModelConfig, RunConfig, TrainingConfig
 from gpt_2.dataset import DataLoaderBundle
 from gpt_2.model import GPTModel
+from gpt_2.pretrain import EvaluationRecord, TrainingResult
 from gpt_2.runtime import ResolvedRuntime
 from gpt_2.workflow import (
     PreparedPretrainRun,
+    PretrainComponents,
     create_pretrain_components,
     create_pretrain_loaders,
     prepare_pretrain_run,
+    run_pretraining,
 )
 
 
@@ -453,3 +457,305 @@ def test_create_pretrain_components_handles_valid_configs(
 
     for param in model.parameters():
         assert param.device.type == "cpu"
+
+
+@pytest.fixture
+def expected_results() -> TrainingResult:
+    return TrainingResult(
+        completed_epochs=2,
+        global_step=100,
+        tokens_seen=100_000,
+        evaluations=(
+            EvaluationRecord(
+                epoch=1,
+                global_step=50,
+                tokens_seen=50_000,
+                train_loss=1e-1,
+                validation_loss=1e-1,
+            ),
+            EvaluationRecord(
+                epoch=2,
+                global_step=100,
+                tokens_seen=100_000,
+                train_loss=1e-1,
+                validation_loss=1e-1,
+            ),
+        ),
+    )
+
+
+@pytest.fixture
+def components(model: GPTModel) -> PretrainComponents:
+    return PretrainComponents(
+        model=model,
+        optimizer=torch.optim.AdamW(model.parameters()),
+    )
+
+
+@pytest.fixture
+def loaders(mocker: MockerFixture) -> DataLoaderBundle:
+    return DataLoaderBundle(
+        train=mocker.Mock(spec=DataLoader),
+        train_eval=mocker.Mock(spec=DataLoader),
+        validation=mocker.Mock(spec=DataLoader),
+        test=mocker.Mock(spec=DataLoader),
+    )
+
+
+@pytest.fixture
+def pt_arguments(tmp_path: Path) -> PretrainArguments:
+    config_path = tmp_path / "config.toml"
+    input_path = tmp_path / "input.txt"
+    output_path = tmp_path / "output"
+    return PretrainArguments(
+        config=config_path,
+        input=input_path,
+        output_dir=output_path,
+    )
+
+
+def test_run_pretraining_correctly_assembles(
+    mocker: MockerFixture,
+    pt_arguments: PretrainArguments,
+    prepared_run: PreparedPretrainRun,
+    components: PretrainComponents,
+    loaders: DataLoaderBundle,
+    expected_results: TrainingResult,
+):
+    mock_prepare = mocker.patch(
+        "gpt_2.workflow.prepare_pretrain_run", autospec=True, return_value=prepared_run
+    )
+    mock_loaders = mocker.patch(
+        "gpt_2.workflow.create_pretrain_loaders", autospec=True, return_value=loaders
+    )
+    mock_create_components = mocker.patch(
+        "gpt_2.workflow.create_pretrain_components",
+        autospec=True,
+        return_value=components,
+    )
+    mock_train = mocker.patch(
+        "gpt_2.workflow.train_model", autospec=True, return_value=expected_results
+    )
+
+    calls = mocker.Mock()
+    calls.attach_mock(mock_prepare, "prepare")
+    calls.attach_mock(mock_loaders, "loaders")
+    calls.attach_mock(mock_create_components, "components")
+    calls.attach_mock(mock_train, "train")
+
+    result = run_pretraining(arguments=pt_arguments)
+
+    assert [call[0] for call in calls.mock_calls] == [
+        "prepare",
+        "loaders",
+        "components",
+        "train",
+    ]
+
+    assert result is expected_results
+    mock_prepare.assert_called_once_with(pt_arguments)
+    mock_loaders.assert_called_once_with(prepared_run)
+    mock_create_components.assert_called_once_with(prepared_run)
+    mock_train.assert_called_once_with(
+        model=components.model,
+        optimizer=components.optimizer,
+        train_loader=loaders.train,
+        train_eval_loader=loaders.train_eval,
+        val_loader=loaders.validation,
+        device=prepared_run.runtime.device,
+        config=prepared_run.config.training,
+    )
+
+
+def test_run_pretraining_preparation_failure(
+    mocker: MockerFixture,
+    pt_arguments: PretrainArguments,
+    components: PretrainComponents,
+    loaders: DataLoaderBundle,
+    expected_results: TrainingResult,
+):
+    mock_prepare = mocker.patch(
+        "gpt_2.workflow.prepare_pretrain_run",
+        autospec=True,
+        side_effect=FileNotFoundError(),
+    )
+    mock_loaders = mocker.patch(
+        "gpt_2.workflow.create_pretrain_loaders", autospec=True, return_value=loaders
+    )
+    mock_create_components = mocker.patch(
+        "gpt_2.workflow.create_pretrain_components",
+        autospec=True,
+        return_value=components,
+    )
+    mock_train = mocker.patch(
+        "gpt_2.workflow.train_model", autospec=True, return_value=expected_results
+    )
+
+    calls = mocker.Mock()
+    calls.attach_mock(mock_prepare, "prepare")
+    calls.attach_mock(mock_loaders, "loaders")
+    calls.attach_mock(mock_create_components, "components")
+    calls.attach_mock(mock_train, "train")
+
+    with pytest.raises(FileNotFoundError):
+        run_pretraining(arguments=pt_arguments)
+
+    assert [call[0] for call in calls.mock_calls] == [
+        "prepare",
+    ]
+
+    mock_prepare.assert_called_once_with(pt_arguments)
+    mock_loaders.assert_not_called()
+    mock_create_components.assert_not_called()
+    mock_train.assert_not_called()
+
+
+def test_run_pretraining_loaders_failure(
+    mocker: MockerFixture,
+    pt_arguments: PretrainArguments,
+    prepared_run: PreparedPretrainRun,
+    components: PretrainComponents,
+    expected_results: TrainingResult,
+):
+    mock_prepare = mocker.patch(
+        "gpt_2.workflow.prepare_pretrain_run",
+        autospec=True,
+        return_value=prepared_run,
+    )
+    mock_loaders = mocker.patch(
+        "gpt_2.workflow.create_pretrain_loaders",
+        autospec=True,
+        side_effect=ValueError(),
+    )
+    mock_create_components = mocker.patch(
+        "gpt_2.workflow.create_pretrain_components",
+        autospec=True,
+        return_value=components,
+    )
+    mock_train = mocker.patch(
+        "gpt_2.workflow.train_model", autospec=True, return_value=expected_results
+    )
+
+    calls = mocker.Mock()
+    calls.attach_mock(mock_prepare, "prepare")
+    calls.attach_mock(mock_loaders, "loaders")
+    calls.attach_mock(mock_create_components, "components")
+    calls.attach_mock(mock_train, "train")
+
+    with pytest.raises(ValueError):
+        run_pretraining(arguments=pt_arguments)
+
+    assert [call[0] for call in calls.mock_calls] == [
+        "prepare",
+        "loaders",
+    ]
+
+    mock_prepare.assert_called_once_with(pt_arguments)
+    mock_loaders.assert_called_once_with(prepared_run)
+    mock_create_components.assert_not_called()
+    mock_train.assert_not_called()
+
+
+def test_run_pretraining_components_failure(
+    mocker: MockerFixture,
+    pt_arguments: PretrainArguments,
+    prepared_run: PreparedPretrainRun,
+    loaders: DataLoaderBundle,
+    expected_results: TrainingResult,
+):
+    mock_prepare = mocker.patch(
+        "gpt_2.workflow.prepare_pretrain_run",
+        autospec=True,
+        return_value=prepared_run,
+    )
+    mock_loaders = mocker.patch(
+        "gpt_2.workflow.create_pretrain_loaders",
+        autospec=True,
+        return_value=loaders,
+    )
+    mock_create_components = mocker.patch(
+        "gpt_2.workflow.create_pretrain_components",
+        autospec=True,
+        side_effect=ValueError(),
+    )
+    mock_train = mocker.patch(
+        "gpt_2.workflow.train_model", autospec=True, return_value=expected_results
+    )
+
+    calls = mocker.Mock()
+    calls.attach_mock(mock_prepare, "prepare")
+    calls.attach_mock(mock_loaders, "loaders")
+    calls.attach_mock(mock_create_components, "components")
+    calls.attach_mock(mock_train, "train")
+
+    with pytest.raises(ValueError):
+        run_pretraining(arguments=pt_arguments)
+
+    assert [call[0] for call in calls.mock_calls] == [
+        "prepare",
+        "loaders",
+        "components",
+    ]
+
+    mock_prepare.assert_called_once_with(pt_arguments)
+    mock_loaders.assert_called_once_with(prepared_run)
+    mock_create_components.assert_called_once_with(prepared_run)
+    mock_train.assert_not_called()
+
+
+def test_run_pretraining_training_failure(
+    mocker: MockerFixture,
+    pt_arguments: PretrainArguments,
+    prepared_run: PreparedPretrainRun,
+    loaders: DataLoaderBundle,
+    components: PretrainComponents,
+):
+    mock_prepare = mocker.patch(
+        "gpt_2.workflow.prepare_pretrain_run",
+        autospec=True,
+        return_value=prepared_run,
+    )
+    mock_loaders = mocker.patch(
+        "gpt_2.workflow.create_pretrain_loaders",
+        autospec=True,
+        return_value=loaders,
+    )
+    mock_create_components = mocker.patch(
+        "gpt_2.workflow.create_pretrain_components",
+        autospec=True,
+        return_value=components,
+    )
+    mock_train = mocker.patch(
+        "gpt_2.workflow.train_model",
+        autospec=True,
+        side_effect=ValueError(),
+    )
+
+    calls = mocker.Mock()
+    calls.attach_mock(mock_prepare, "prepare")
+    calls.attach_mock(mock_loaders, "loaders")
+    calls.attach_mock(mock_create_components, "components")
+    calls.attach_mock(mock_train, "train")
+
+    with pytest.raises(ValueError):
+        run_pretraining(arguments=pt_arguments)
+
+    assert [call[0] for call in calls.mock_calls] == [
+        "prepare",
+        "loaders",
+        "components",
+        "train",
+    ]
+
+    mock_prepare.assert_called_once_with(pt_arguments)
+    mock_loaders.assert_called_once_with(prepared_run)
+    mock_create_components.assert_called_once_with(prepared_run)
+    mock_train.assert_called_with(
+        model=components.model,
+        optimizer=components.optimizer,
+        train_loader=loaders.train,
+        train_eval_loader=loaders.train_eval,
+        val_loader=loaders.validation,
+        device=prepared_run.runtime.device,
+        config=prepared_run.config.training,
+    )

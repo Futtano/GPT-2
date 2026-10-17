@@ -75,20 +75,25 @@ Completed in this stage:
   evaluation preserves the training generator and global PyTorch RNG state.
 - Extended configured-settings, partial-batch, shape, and dtype checks to all
   four loaders.
+- Assembled preparation, loaders, model/optimizer construction, and training
+  through run_pretraining, returning the training result in memory.
+- Verified stage order, exact argument forwarding, returned result identity,
+  and failure propagation at each stage using autospecced mocks.
 
-## Current task: assemble the in-memory pre-training workflow
+## Current task: exercise a real tiny CPU workflow
 
-Connect preparation, loader construction, model/optimizer construction, and
-train_model in one workflow function. Return TrainingResult, forwarding the
-resolved device, training configuration, and the separate training-evaluation
-loader. Test assembly and failures without evaluating held-out test data;
-artifact writing and checkpoint/model-selection support remain later milestones.
+Add an integration test running run_pretraining through real TOML loading,
+UTF-8 input loading, GPT-2 tokenization, loader construction, model creation,
+optimization, and evaluation with a tiny CPU configuration. Verify meaningful
+progress and finite recorded losses. This checkpoint returns in-memory results;
+artifact writes, model selection, and checkpoint persistence remain subsequent
+milestones.
 
 ## Next milestones
 
 ### 1. Build the executable training workflow
 
-- Connect the assembled workflow to train_model.
+- Verify the assembled workflow with a real tiny CPU integration test.
 - Evaluate the held-out test split only after model selection.
 
 ### 2. Define and write run artifacts
@@ -163,3 +168,4 @@ artifact writing and checkpoint/model-selection support remain later milestones.
 - [Mode-preserving evaluation](engineering-notes/26-mode-preserving-evaluation.md)
 - [Typed training progress and scheduling](engineering-notes/27-typed-training-progress-and-scheduling.md)
 - [Evaluation-loader RNG isolation](engineering-notes/28-evaluation-loader-rng-isolation.md)
+- [Assembled workflow and cross-function mocks](engineering-notes/29-assembled-workflow-and-cross-function-mocks.md)

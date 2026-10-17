@@ -20,6 +20,7 @@ Current implementation status and upcoming milestones live in the
 26. [Preserve model mode and inspect evaluation state](engineering-notes/26-mode-preserving-evaluation.md)
 27. [Track typed training progress and evaluation schedules](engineering-notes/27-typed-training-progress-and-scheduling.md)
 28. [Isolate evaluation-loader random state](engineering-notes/28-evaluation-loader-rng-isolation.md)
+29. [Assemble workflows and verify cross-function mock calls](engineering-notes/29-assembled-workflow-and-cross-function-mocks.md)
 
 ## Packaging and compatibility
 
