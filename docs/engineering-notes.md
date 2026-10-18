@@ -39,6 +39,7 @@ Current implementation status and upcoming milestones live in the
 30. [Verify real workflow integration and test import modes](engineering-notes/30-real-workflow-integration-and-test-imports.md)
 31. [Serialize run metadata and refuse artifact overwrites](engineering-notes/31-run-metadata-and-exclusive-json-writes.md)
 32. [Persist metadata during preparation and verify the artifact](engineering-notes/32-persist-metadata-during-preparation.md)
+33. [Describe dataset identity and exact token split boundaries](engineering-notes/33-dataset-identity-and-token-boundaries.md)
 
 ## Configuration and project structure
 

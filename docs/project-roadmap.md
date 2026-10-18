@@ -97,14 +97,18 @@ Completed in this stage:
   propagation.
 - Verified persisted JSON against the original TOML settings and expected
   runtime values in the real tiny CPU integration test.
+- Built versioned dataset metadata with raw-byte SHA-256 identity, byte/token
+  counts, tokenizer policy, and contiguous exclusive split boundaries.
+- Verified separate fraction rounding, digest changes, empty-split error
+  propagation, complete token coverage, and unchanged inputs.
 
-## Current task: record dataset identity and split boundaries
+## Current task: write dataset metadata as JSON
 
-Define dataset metadata identifying the input content and tokenizer policy,
-token count, and exact disjoint split boundaries. Reuse the existing split
-semantics and make metadata construction and writing testable before wiring
-the artifact into data preparation. Metric files, model selection, and
-checkpoint persistence follow afterward.
+Add a dataset metadata writer using serialization before opening, strict JSON,
+UTF-8, and exclusive creation, consistent with run metadata. Verify JSON
+round-trip and write failures before integration. Then connect dataset metadata
+to a single source read shared with tokenization. Metric files, model selection,
+and checkpoint persistence follow afterward.
 
 ## Next milestones
 
@@ -114,7 +118,8 @@ checkpoint persistence follow afterward.
 
 ### 2. Define and write run artifacts
 
-- Record source-data identity and split boundaries.
+- Persist dataset identity and split boundaries from the bytes used for
+  tokenization.
 - Store metrics in a machine-readable tabular format.
 - Save loss curves without requiring an interactive display.
 - Make artifact writes explicit and testable.
@@ -187,3 +192,4 @@ checkpoint persistence follow afterward.
 - [Real workflow integration and test imports](engineering-notes/30-real-workflow-integration-and-test-imports.md)
 - [Run metadata and exclusive JSON writes](engineering-notes/31-run-metadata-and-exclusive-json-writes.md)
 - [Persisting metadata during preparation](engineering-notes/32-persist-metadata-during-preparation.md)
+- [Dataset identity and token boundaries](engineering-notes/33-dataset-identity-and-token-boundaries.md)

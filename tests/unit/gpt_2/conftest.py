@@ -44,6 +44,16 @@ def training_config():
 
 
 @pytest.fixture
+def data_config():
+    return DataConfig(
+        train_fraction=0.6,
+        validation_fraction=0.2,
+        stride=100,
+        num_workers=2,
+    )
+
+
+@pytest.fixture
 def run_config() -> RunConfig:
     return RunConfig(
         model=ModelConfig(
