@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import torch
 
+from gpt_2.artifacts import write_run_metadata
 from gpt_2.cli import PretrainArguments
 from gpt_2.config import RunConfig, load_run_config
 from gpt_2.dataset import DataLoaderBundle, create_data_loaders, load_text_token_ids
@@ -43,6 +44,11 @@ def prepare_pretrain_run(
     seed_random_sources(seed=config.training.seed)
     arguments.output_dir.mkdir(parents=True, exist_ok=False)
     runtime = ResolvedRuntime(device=resolved_device, seed=config.training.seed)
+    write_run_metadata(
+        arguments.output_dir / "run-config.json",
+        config=config,
+        runtime=runtime,
+    )
 
     return PreparedPretrainRun(
         arguments=arguments,

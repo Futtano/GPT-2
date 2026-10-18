@@ -73,6 +73,18 @@ def test_prepare_pretrain_run_valid_input(
         autospec=True,
     )
 
+    def check_output_directory(
+        path: Path, *, config: RunConfig, runtime: ResolvedRuntime
+    ) -> None:
+        assert path.parent == outputs_dir
+        assert path.parent.is_dir()
+
+    mock_write_run_metadata = mocker.patch(
+        "gpt_2.workflow.write_run_metadata",
+        autospec=True,
+        side_effect=check_output_directory,
+    )
+
     arguments = PretrainArguments(
         config=config_file,
         input=input_file,
@@ -80,20 +92,24 @@ def test_prepare_pretrain_run_valid_input(
     )
 
     result = prepare_pretrain_run(arguments=arguments)
+    runtime = ResolvedRuntime(
+        device=torch.device("cuda"),
+        seed=run_config.training.seed,
+    )
 
     assert result == PreparedPretrainRun(
         arguments=arguments,
         config=run_config,
-        runtime=ResolvedRuntime(
-            device=torch.device("cuda"),
-            seed=run_config.training.seed,
-        ),
+        runtime=runtime,
     )
 
     assert outputs_dir.is_dir()
     mock_load_run_config.assert_called_once_with(config_file)
     mock_resolve_device.assert_called_once_with("auto")
     mock_seed_random_sources.assert_called_once_with(run_config.training.seed)
+    mock_write_run_metadata.assert_called_once_with(
+        outputs_dir / "run-config.json", config=run_config, runtime=runtime
+    )
 
 
 def test_prepare_pretrain_run_raises_if_config_file_not_exists(
@@ -122,6 +138,10 @@ def test_prepare_pretrain_run_raises_if_config_file_not_exists(
         autospec=True,
     )
 
+    mock_write_run_metadata = mocker.patch(
+        "gpt_2.workflow.write_run_metadata", autospec=True
+    )
+
     arguments = PretrainArguments(
         config=config_file,
         input=input_file,
@@ -134,6 +154,7 @@ def test_prepare_pretrain_run_raises_if_config_file_not_exists(
     mock_load_run_config.assert_not_called()
     mock_resolve_device.assert_not_called()
     mock_seed_random_sources.assert_not_called()
+    mock_write_run_metadata.assert_not_called()
     assert not outputs_dir.exists()
 
 
@@ -165,6 +186,10 @@ def test_prepare_pretrain_run_raises_if_input_file_not_exists(
         autospec=True,
     )
 
+    mock_write_run_metadata = mocker.patch(
+        "gpt_2.workflow.write_run_metadata", autospec=True
+    )
+
     arguments = PretrainArguments(
         config=config_file,
         input=input_file,
@@ -177,6 +202,7 @@ def test_prepare_pretrain_run_raises_if_input_file_not_exists(
     mock_load_run_config.assert_not_called()
     mock_resolve_device.assert_not_called()
     mock_seed_random_sources.assert_not_called()
+    mock_write_run_metadata.assert_not_called()
     assert not outputs_dir.exists()
 
 
@@ -208,6 +234,10 @@ def test_prepare_pretrain_run_raises_if_output_dir_exists(
         autospec=True,
     )
 
+    mock_write_run_metadata = mocker.patch(
+        "gpt_2.workflow.write_run_metadata", autospec=True
+    )
+
     arguments = PretrainArguments(
         config=config_file,
         input=input_file,
@@ -220,6 +250,62 @@ def test_prepare_pretrain_run_raises_if_output_dir_exists(
     assert outputs_dir.exists()
     mock_resolve_device.assert_not_called()
     mock_seed_random_sources.assert_not_called()
+    mock_write_run_metadata.assert_not_called()
+
+
+def test_prepare_pretrain_run_write_metadata_failure(
+    tmp_path: Path, mocker: MockerFixture, run_config: RunConfig
+):
+    config_file = tmp_path / "pretrain-tiny.toml"
+    input_file = tmp_path / "training.txt"
+    outputs_dir = tmp_path / "run-001"
+
+    config_file.touch()
+    input_file.write_text("Some input text", encoding="utf-8")
+
+    mock_load_run_config = mocker.patch(
+        "gpt_2.workflow.load_run_config",
+        autospec=True,
+        return_value=run_config,
+    )
+
+    mock_resolve_device = mocker.patch(
+        "gpt_2.workflow.resolve_device",
+        autospec=True,
+        return_value=torch.device("cuda"),
+    )
+
+    mock_seed_random_sources = mocker.patch(
+        "gpt_2.workflow.seed_random_sources",
+        autospec=True,
+    )
+
+    mock_write_run_metadata = mocker.patch(
+        "gpt_2.workflow.write_run_metadata",
+        autospec=True,
+        side_effect=OSError("metadata write failed"),
+    )
+
+    arguments = PretrainArguments(
+        config=config_file,
+        input=input_file,
+        output_dir=outputs_dir,
+    )
+    with pytest.raises(OSError, match="metadata"):
+        prepare_pretrain_run(arguments=arguments)
+
+    runtime = ResolvedRuntime(
+        device=torch.device("cuda"),
+        seed=run_config.training.seed,
+    )
+
+    assert outputs_dir.is_dir()
+    mock_load_run_config.assert_called_once_with(config_file)
+    mock_resolve_device.assert_called_once_with("auto")
+    mock_seed_random_sources.assert_called_once_with(run_config.training.seed)
+    mock_write_run_metadata.assert_called_once_with(
+        outputs_dir / "run-config.json", config=run_config, runtime=runtime
+    )
 
 
 def test_invalid_config_does_not_create_output(
@@ -250,6 +336,10 @@ def test_invalid_config_does_not_create_output(
         autospec=True,
     )
 
+    mock_write_run_metadata = mocker.patch(
+        "gpt_2.workflow.write_run_metadata", autospec=True
+    )
+
     arguments = PretrainArguments(
         config=config_file,
         input=input_file,
@@ -262,6 +352,7 @@ def test_invalid_config_does_not_create_output(
     mock_load_run_config.assert_called_once_with(config_file)
     mock_resolve_device.assert_not_called()
     mock_seed_random_sources.assert_not_called()
+    mock_write_run_metadata.assert_not_called()
     assert not output_dir.exists()
 
 
@@ -292,6 +383,10 @@ def test_prepare_pretrain_fails_if_device_resolution_fails(
         autospec=True,
     )
 
+    mock_write_run_metadata = mocker.patch(
+        "gpt_2.workflow.write_run_metadata", autospec=True
+    )
+
     arguments = PretrainArguments(
         config=config_file,
         input=input_file,
@@ -304,6 +399,7 @@ def test_prepare_pretrain_fails_if_device_resolution_fails(
     mock_load_run_config.assert_called_once_with(config_file)
     mock_resolve_device.assert_called_once_with("auto")
     mock_seed_random_sources.assert_not_called()
+    mock_write_run_metadata.assert_not_called()
     assert not outputs_dir.exists()
 
 

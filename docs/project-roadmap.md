@@ -92,14 +92,19 @@ Completed in this stage:
   strict finite-number encoding, and exclusive creation to prevent overwrites.
 - Verified metadata shape, JSON round-trip, existing-file protection,
   missing-parent errors, and unchanged input records.
+- Connected run-config.json writing to successful preparation and verified
+  directory-before-write ordering, early failure paths, and write-error
+  propagation.
+- Verified persisted JSON against the original TOML settings and expected
+  runtime values in the real tiny CPU integration test.
 
-## Current task: write metadata during run preparation
+## Current task: record dataset identity and split boundaries
 
-Call write_run_metadata for run-config.json after the fresh run directory and
-ResolvedRuntime are created, before preparation returns. Verify arguments and
-failure propagation in workflow unit tests, and assert the persisted metadata
-in the real CPU integration test. Dataset identity, metric files, model
-selection, and checkpoint persistence follow afterward.
+Define dataset metadata identifying the input content and tokenizer policy,
+token count, and exact disjoint split boundaries. Reuse the existing split
+semantics and make metadata construction and writing testable before wiring
+the artifact into data preparation. Metric files, model selection, and
+checkpoint persistence follow afterward.
 
 ## Next milestones
 
@@ -109,7 +114,6 @@ selection, and checkpoint persistence follow afterward.
 
 ### 2. Define and write run artifacts
 
-- Connect the configuration/runtime artifact writer to run preparation.
 - Record source-data identity and split boundaries.
 - Store metrics in a machine-readable tabular format.
 - Save loss curves without requiring an interactive display.
@@ -182,3 +186,4 @@ selection, and checkpoint persistence follow afterward.
 - [Assembled workflow and cross-function mocks](engineering-notes/29-assembled-workflow-and-cross-function-mocks.md)
 - [Real workflow integration and test imports](engineering-notes/30-real-workflow-integration-and-test-imports.md)
 - [Run metadata and exclusive JSON writes](engineering-notes/31-run-metadata-and-exclusive-json-writes.md)
+- [Persisting metadata during preparation](engineering-notes/32-persist-metadata-during-preparation.md)

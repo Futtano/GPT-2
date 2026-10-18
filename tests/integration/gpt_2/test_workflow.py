@@ -1,4 +1,6 @@
+import json
 import math
+import tomllib
 from collections.abc import Generator
 from pathlib import Path
 
@@ -83,3 +85,11 @@ def test_integration_run_pretraining(output_dir: Path, arguments: PretrainArgume
     for record in result.evaluations:
         assert math.isfinite(record.train_loss)
         assert math.isfinite(record.validation_loss)
+
+    metadata_path = output_dir / "run-config.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert metadata == {
+        "schema_version": 1,
+        "config": tomllib.loads(TOML_CONFIG),
+        "runtime": {"device": "cpu", "seed": 123},
+    }

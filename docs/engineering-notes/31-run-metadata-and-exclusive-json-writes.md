@@ -96,10 +96,10 @@ own isolated `tmp_path`.
 
 ## Integration status
 
-The serialization and writer boundary is complete. The workflow does not yet
-call the writer. Next, preparation will persist `run-config.json` after creating
-its fresh output directory and before returning the prepared run. Later
-training failures may then leave useful configuration evidence in that run
+The serialization and writer boundary is complete. Preparation now persists
+`run-config.json` after creating its fresh output directory and before returning
+the prepared run; see [preparation integration](32-persist-metadata-during-preparation.md).
+Later training failures may leave useful configuration evidence in that run
 directory; rollback is a separate policy decision.
 
 ## Further reading
