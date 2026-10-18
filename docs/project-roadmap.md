@@ -84,13 +84,22 @@ Completed in this stage:
 - Configured pytest importlib mode so matching unit and integration test
   filenames are collected together without module-name collisions.
 
-## Current task: persist run configuration and runtime metadata
+## Completed artifact foundations
 
-Define the first run artifact: a JSON record of validated configuration and
-effective runtime settings. Preserve requested values such as device="auto"
-alongside the resolved device string. Make serialization and writing testable
-before connecting them to workflow execution. Dataset identity, metric files,
-model selection, and checkpoint persistence follow afterward.
+- Added a versioned JSON metadata payload preserving validated configuration
+  and effective device/seed settings.
+- Serialized metadata before file creation, with UTF-8, readable formatting,
+  strict finite-number encoding, and exclusive creation to prevent overwrites.
+- Verified metadata shape, JSON round-trip, existing-file protection,
+  missing-parent errors, and unchanged input records.
+
+## Current task: write metadata during run preparation
+
+Call write_run_metadata for run-config.json after the fresh run directory and
+ResolvedRuntime are created, before preparation returns. Verify arguments and
+failure propagation in workflow unit tests, and assert the persisted metadata
+in the real CPU integration test. Dataset identity, metric files, model
+selection, and checkpoint persistence follow afterward.
 
 ## Next milestones
 
@@ -100,7 +109,7 @@ model selection, and checkpoint persistence follow afterward.
 
 ### 2. Define and write run artifacts
 
-- Save the resolved configuration.
+- Connect the configuration/runtime artifact writer to run preparation.
 - Record source-data identity and split boundaries.
 - Store metrics in a machine-readable tabular format.
 - Save loss curves without requiring an interactive display.
@@ -172,3 +181,4 @@ model selection, and checkpoint persistence follow afterward.
 - [Evaluation-loader RNG isolation](engineering-notes/28-evaluation-loader-rng-isolation.md)
 - [Assembled workflow and cross-function mocks](engineering-notes/29-assembled-workflow-and-cross-function-mocks.md)
 - [Real workflow integration and test imports](engineering-notes/30-real-workflow-integration-and-test-imports.md)
+- [Run metadata and exclusive JSON writes](engineering-notes/31-run-metadata-and-exclusive-json-writes.md)

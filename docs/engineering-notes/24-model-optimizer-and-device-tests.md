@@ -40,9 +40,7 @@ lists for comparison:
 
 ```python
 optimizer_parameters = [
-    parameter
-    for group in optimizer.param_groups
-    for parameter in group["params"]
+    parameter for group in optimizer.param_groups for parameter in group["params"]
 ]
 model_parameters = list(model.parameters())
 

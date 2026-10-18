@@ -37,6 +37,7 @@ Current implementation status and upcoming milestones live in the
 11. [Write assertions that can fail meaningfully](engineering-notes/11-effective-assertions.md)
 19. [Test typed boundaries without hiding errors](engineering-notes/19-typed-negative-tests-and-mocking.md)
 30. [Verify real workflow integration and test import modes](engineering-notes/30-real-workflow-integration-and-test-imports.md)
+31. [Serialize run metadata and refuse artifact overwrites](engineering-notes/31-run-metadata-and-exclusive-json-writes.md)
 
 ## Configuration and project structure
 

@@ -6,7 +6,7 @@ from pytest_mock import MockerFixture
 from torch.utils.data import DataLoader
 
 from gpt_2.cli import PretrainArguments
-from gpt_2.config import DataConfig, ModelConfig, RunConfig, TrainingConfig
+from gpt_2.config import RunConfig
 from gpt_2.dataset import DataLoaderBundle
 from gpt_2.model import GPTModel
 from gpt_2.pretrain import EvaluationRecord, TrainingResult
@@ -19,37 +19,6 @@ from gpt_2.workflow import (
     prepare_pretrain_run,
     run_pretraining,
 )
-
-
-@pytest.fixture
-def run_config() -> RunConfig:
-    return RunConfig(
-        model=ModelConfig(
-            vocab_size=128,
-            context_length=32,
-            emb_dim=16,
-            n_heads=4,
-            n_layers=1,
-            drop_rate=0.0,
-            qkv_bias=False,
-        ),
-        data=DataConfig(
-            train_fraction=0.7,
-            validation_fraction=0.15,
-            stride=100,
-            num_workers=2,
-        ),
-        training=TrainingConfig(
-            batch_size=8,
-            learning_rate=3e-4,
-            num_epochs=2,
-            eval_every_steps=50,
-            eval_batches=5,
-            checkpoint_every_steps=100,
-            seed=0,
-            device="auto",
-        ),
-    )
 
 
 @pytest.fixture

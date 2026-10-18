@@ -59,7 +59,10 @@ After execution, the test extracts the names:
 
 ```python
 assert [call[0] for call in calls.mock_calls] == [
-    "prepare", "loaders", "components", "train",
+    "prepare",
+    "loaders",
+    "components",
+    "train",
 ]
 ```
 

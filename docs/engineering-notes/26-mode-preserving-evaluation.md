@@ -20,9 +20,7 @@ try:
         train_loss = calc_loss_loader(
             train_loader, model, device, num_batches=eval_iter
         )
-        val_loss = calc_loss_loader(
-            val_loader, model, device, num_batches=eval_iter
-        )
+        val_loss = calc_loss_loader(val_loader, model, device, num_batches=eval_iter)
 finally:
     model.train(was_training)
 ```
@@ -49,6 +47,7 @@ def fake_loss(data_loader, model, device, num_batches=None):
     assert model.training is False
     assert torch.is_grad_enabled() is False
     return 2.0
+
 
 mocker.patch(
     "gpt_2.pretrain.calc_loss_loader",
